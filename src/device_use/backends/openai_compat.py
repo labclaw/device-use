@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from typing import Any
 
 import backoff
@@ -94,9 +95,9 @@ class OpenAICompatBackend:
         raw = await self._call(messages)
 
         try:
-            result = json.loads(raw)
+            result = json.loads(_strip_markdown_fences(raw))
         except json.JSONDecodeError:
-            logger.warning("Failed to parse observe response as JSON: %s", raw)
+            logger.warning("Failed to parse observe response as JSON: %s", raw[:200])
             result = {"description": raw, "elements": []}
 
         return result
@@ -140,11 +141,11 @@ class OpenAICompatBackend:
         raw = await self._call(messages)
 
         try:
-            result = json.loads(raw)
+            result = json.loads(_strip_markdown_fences(raw))
         except json.JSONDecodeError:
-            logger.warning("Failed to parse plan response as JSON: %s", raw)
+            logger.warning("Failed to parse plan response as JSON: %s", raw[:200])
             result = {
-                "action": {"action_type": "wait", "target": "", "parameters": {}},
+                "action": {"action_type": "wait", "seconds": 1},
                 "reasoning": raw,
                 "done": False,
                 "confidence": 0.0,
@@ -161,3 +162,10 @@ class OpenAICompatBackend:
         The agent loop should fall back to OmniParser or similar.
         """
         return None
+
+
+def _strip_markdown_fences(text: str) -> str:
+    """Strip ```json ... ``` markdown fences from VLM responses."""
+    stripped = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
+    stripped = re.sub(r"\n?```\s*$", "", stripped)
+    return stripped.strip()

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
-from device_use.core.models import ActionRequest, DeviceProfile
+from device_use.core.models import ActionRequest, ActionType, DeviceProfile
 from device_use.safety.models import SafetyConfig, SafetyVerdict
+
+logger = logging.getLogger(__name__)
 
 
 class ActionWhitelistChecker:
@@ -39,18 +42,27 @@ class ParameterBoundsChecker:
             return SafetyVerdict(allowed=True)
 
         # Check forbidden_regions against action coordinates
-        if action.coordinates and profile.safety.forbidden_regions:
-            ax, ay = action.coordinates
-            for rx, ry, rw, rh in profile.safety.forbidden_regions:
-                if rx <= ax < rx + rw and ry <= ay < ry + rh:
-                    return SafetyVerdict(
-                        allowed=False,
-                        layer="L2_parameter_bounds",
-                        reason=(
-                            f"Coordinates ({ax}, {ay}) fall within "
-                            f"forbidden region ({rx}, {ry}, {rw}, {rh})"
-                        ),
-                    )
+        if profile.safety.forbidden_regions:
+            coords_to_check = []
+            if action.coordinates:
+                coords_to_check.append(action.coordinates)
+            # Also check drag end coordinates
+            end_x = action.parameters.get("end_x")
+            end_y = action.parameters.get("end_y")
+            if end_x is not None and end_y is not None:
+                coords_to_check.append((end_x, end_y))
+
+            for ax, ay in coords_to_check:
+                for rx, ry, rw, rh in profile.safety.forbidden_regions:
+                    if rx <= ax < rx + rw and ry <= ay < ry + rh:
+                        return SafetyVerdict(
+                            allowed=False,
+                            layer="L2_parameter_bounds",
+                            reason=(
+                                f"Coordinates ({ax}, {ay}) fall within "
+                                f"forbidden region ({rx}, {ry}, {rw}, {rh})"
+                            ),
+                        )
 
         bounds = profile.safety.bounds
         for key, value in action.parameters.items():
@@ -67,7 +79,11 @@ class ParameterBoundsChecker:
                             ),
                         )
                 except (TypeError, ValueError):
-                    pass
+                    logger.warning(
+                        "Cannot check bounds for parameter '%s': "
+                        "value %r is not numeric",
+                        key, value,
+                    )
 
             max_key = f"{key}_max"
             if max_key in bounds:
@@ -82,7 +98,11 @@ class ParameterBoundsChecker:
                             ),
                         )
                 except (TypeError, ValueError):
-                    pass
+                    logger.warning(
+                        "Cannot check bounds for parameter '%s': "
+                        "value %r is not numeric",
+                        key, value,
+                    )
 
         return SafetyVerdict(allowed=True)
 

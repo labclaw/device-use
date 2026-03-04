@@ -165,6 +165,7 @@ class TestPlan:
             result = await backend.plan(TINY_PNG, task="Open file")
 
         assert result["action"]["action_type"] == "wait"
+        assert result["action"]["seconds"] == 1
         assert result["reasoning"] == raw_text
         assert result["done"] is False
         assert result["confidence"] == 0.0
@@ -219,6 +220,38 @@ class TestRetryBehavior:
 
         # backoff max_tries=5 means up to 5 attempts
         assert mock_create.call_count == 5
+
+
+class TestMarkdownFenceStripping:
+    async def test_plan_with_markdown_fenced_json(
+        self, backend: OpenAICompatBackend
+    ):
+        """VLM wraps JSON in ```json fences — should still parse."""
+        fenced_json = '```json\n{"action": {"action_type": "click", "target": "button"}, "reasoning": "test", "done": false, "confidence": 0.8}\n```'
+        with patch.object(
+            backend._client.chat.completions,
+            "create",
+            new_callable=AsyncMock,
+            return_value=_make_chat_response(fenced_json),
+        ):
+            result = await backend.plan(TINY_PNG, task="Click")
+
+        assert result["action"]["action_type"] == "click"
+        assert result["confidence"] == 0.8
+
+    async def test_observe_with_markdown_fenced_json(
+        self, backend: OpenAICompatBackend
+    ):
+        fenced_json = '```json\n{"description": "Desktop window", "elements": []}\n```'
+        with patch.object(
+            backend._client.chat.completions,
+            "create",
+            new_callable=AsyncMock,
+            return_value=_make_chat_response(fenced_json),
+        ):
+            result = await backend.observe(TINY_PNG)
+
+        assert result["description"] == "Desktop window"
 
 
 class TestCallParameters:

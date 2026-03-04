@@ -258,6 +258,27 @@ class TestL2ParameterBounds:
         verdict = checker.check(action, profile, hardware_config)
         assert verdict.allowed is True
 
+    def test_forbidden_region_blocks_drag_end(self, hardware_config: SafetyConfig):
+        """Drag end coordinates inside forbidden region → blocked."""
+        profile = DeviceProfile(
+            name="test-hw",
+            software="Inst",
+            hardware_connected=True,
+            safety=SafetyConstraints(
+                forbidden_regions=[(500, 500, 100, 100)],
+            ),
+        )
+        checker = ParameterBoundsChecker()
+        # Start is outside, end is inside forbidden region
+        action = ActionRequest(
+            action_type=ActionType.DRAG,
+            coordinates=(200, 200),
+            parameters={"end_x": 550, "end_y": 550},
+        )
+        verdict = checker.check(action, profile, hardware_config)
+        assert verdict.allowed is False
+        assert "forbidden region" in verdict.reason
+
     def test_forbidden_region_skipped_software(self, software_config: SafetyConfig):
         profile = DeviceProfile(
             name="test-sw",

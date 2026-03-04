@@ -118,8 +118,10 @@ class WindowManager:
     # -- Linux internals --
 
     @staticmethod
-    def _normalize_id(window_id: str) -> int:
-        """Convert any hex or decimal window id string to an int for comparison."""
+    def _normalize_id(window_id: str | int) -> int:
+        """Convert any hex or decimal window id (str or int) to an int for comparison."""
+        if isinstance(window_id, int):
+            return window_id
         return int(window_id, 16) if window_id.startswith("0x") else int(window_id)
 
     def _check_linux_deps(self) -> None:

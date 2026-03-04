@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from device_use.core.models import ActionType
@@ -20,7 +22,7 @@ class ClickAction(BaseAction):
     action_type: ActionType = ActionType.CLICK
     x: int
     y: int
-    button: str = "left"  # left, right, middle
+    button: Literal["left", "right", "middle"] = "left"
 
 
 class DoubleClickAction(BaseAction):
@@ -93,11 +95,18 @@ def parse_action(data: dict) -> Action:
     action_type = ActionType(data.get("action_type", data.get("type", "")))
     data["action_type"] = action_type.value
 
+    # Flatten nested "parameters" dict (OpenAI backend format)
+    params = data.pop("parameters", None)
+    if isinstance(params, dict):
+        for k, v in params.items():
+            data.setdefault(k, v)
+
     # Normalize "coordinates": [x, y] -> "x", "y" (VLM prompt format)
     coords = data.get("coordinates")
     if isinstance(coords, (list, tuple)) and len(coords) == 2:
         data.setdefault("x", int(coords[0]))
         data.setdefault("y", int(coords[1]))
+
     type_map: dict[ActionType, type[BaseAction]] = {
         ActionType.CLICK: ClickAction,
         ActionType.DOUBLE_CLICK: DoubleClickAction,

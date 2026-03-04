@@ -6,6 +6,7 @@ This prevents context window overflow while preserving reasoning chain.
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -81,9 +82,14 @@ class AgentHistory:
 
             # Screenshot (only if still present after compaction)
             if entry.screenshot is not None:
+                b64 = base64.standard_b64encode(entry.screenshot).decode("utf-8")
                 content_parts.append({
                     "type": "image",
-                    "data": entry.screenshot,
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": b64,
+                    },
                 })
 
             messages.append({"role": "user", "content": content_parts})

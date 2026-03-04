@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SafetyLevel(str, Enum):
@@ -36,6 +36,13 @@ class ScreenDefinition(BaseModel):
     width: int = 1920
     height: int = 1080
     scale_factor: float = 1.0
+
+    @field_validator("width", "height")
+    @classmethod
+    def _positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError(f"Screen dimension must be > 0, got {v}")
+        return v
 
 
 class UIElement(BaseModel):

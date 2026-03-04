@@ -33,6 +33,16 @@ class CoordinateScaler:
     window_x: int = 0
     window_y: int = 0
 
+    def __post_init__(self) -> None:
+        if self.vlm_width <= 0 or self.vlm_height <= 0:
+            raise ValueError(
+                f"VLM dimensions must be > 0, got {self.vlm_width}x{self.vlm_height}"
+            )
+        if self.screen_width <= 0 or self.screen_height <= 0:
+            raise ValueError(
+                f"Screen dimensions must be > 0, got {self.screen_width}x{self.screen_height}"
+            )
+
     @property
     def scale_x(self) -> float:
         return self.screen_width / self.vlm_width if self.vlm_width else 1.0

@@ -76,7 +76,7 @@ class GUIDriver:
             self._connected = True
             logger.info("GUIDriver connected: %s", self._profile.name)
             return True
-        except Exception as e:
+        except (ValueError, RuntimeError, OSError) as e:
             logger.error("GUIDriver connection failed: %s", e)
             return False
 

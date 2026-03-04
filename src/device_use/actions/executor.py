@@ -12,6 +12,7 @@ import time
 from typing import TYPE_CHECKING
 
 import pyautogui
+from pyautogui import FailSafeException as _FailSafeException
 import pyperclip
 
 from device_use.actions.models import (
@@ -98,6 +99,10 @@ class ActionExecutor:
                 success=True, action=request, duration_ms=duration_ms
             )
 
+        except _FailSafeException:
+            # Physical emergency stop (mouse moved to corner) — MUST propagate
+            raise
+
         except Exception as e:
             duration_ms = (time.monotonic() - start) * 1000
             logger.error("Action execution failed: %s", e)
@@ -160,24 +165,28 @@ class ActionExecutor:
             return self._scaler.vlm_to_screen(x, y)
         return x, y
 
-    @staticmethod
-    def _action_to_request(action: Action) -> ActionRequest:
-        """Convert typed Action to ActionRequest for safety checking."""
+    def _action_to_request(self, action: Action) -> ActionRequest:
+        """Convert typed Action to ActionRequest for safety checking.
+
+        Coordinates are scaled to screen space so safety checks
+        (e.g. forbidden regions) compare against screen-space coordinates.
+        """
         coords = None
         params = {}
 
         if isinstance(action, (ClickAction, DoubleClickAction, RightClickAction)):
-            coords = (action.x, action.y)
+            coords = self._scale(action.x, action.y)
         elif isinstance(action, TypeAction):
             params = {"text": action.text}
         elif isinstance(action, HotkeyAction):
             params = {"keys": action.keys}
         elif isinstance(action, ScrollAction):
-            coords = (action.x, action.y)
+            coords = self._scale(action.x, action.y)
             params = {"clicks": action.clicks}
         elif isinstance(action, DragAction):
-            coords = (action.start_x, action.start_y)
-            params = {"end_x": action.end_x, "end_y": action.end_y}
+            coords = self._scale(action.start_x, action.start_y)
+            ex, ey = self._scale(action.end_x, action.end_y)
+            params = {"end_x": ex, "end_y": ey}
         elif isinstance(action, WaitAction):
             params = {"seconds": action.seconds}
 

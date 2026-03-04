@@ -11,6 +11,8 @@ import logging
 import time
 from typing import Any
 
+from pyautogui import FailSafeException as _FailSafeException
+
 from device_use.actions.executor import ActionExecutor
 from device_use.actions.models import parse_action
 from device_use.actions.scaling import CoordinateScaler
@@ -86,6 +88,8 @@ class DeviceAgent:
         logger.info("Starting task: %s (profile: %s)", task, self._profile.name)
         start_time = time.monotonic()
         all_actions: list[ActionResult] = []
+        consecutive_parse_failures = 0
+        max_parse_failures = 3
 
         try:
             for step in range(self._max_steps):
@@ -127,8 +131,13 @@ class DeviceAgent:
                 action_data = plan.get("action", {})
                 try:
                     action = parse_action(action_data)
-                except (ValueError, Exception) as e:
-                    logger.error("Failed to parse action: %s", e)
+                    consecutive_parse_failures = 0
+                except (ValueError, KeyError, TypeError) as e:
+                    consecutive_parse_failures += 1
+                    logger.error(
+                        "Failed to parse action (%d/%d): %s",
+                        consecutive_parse_failures, max_parse_failures, e,
+                    )
                     self._history.add(HistoryEntry(
                         step=step,
                         action=action_data,
@@ -138,6 +147,15 @@ class DeviceAgent:
                         success=False,
                     ))
                     self._history.compact()
+                    if consecutive_parse_failures >= max_parse_failures:
+                        return AgentResult(
+                            success=False,
+                            task=task,
+                            error=f"Too many consecutive parse failures ({max_parse_failures})",
+                            actions=all_actions,
+                            steps=step + 1,
+                            duration_ms=(time.monotonic() - start_time) * 1000,
+                        )
                     continue
 
                 result = self._executor.execute(action)
@@ -145,7 +163,6 @@ class DeviceAgent:
 
                 # VERIFY
                 verify_screenshot = await self._capture_screenshot()
-                # (Optional: send to VLM for verification, especially for hardware)
 
                 # UPDATE history
                 self._history.add(HistoryEntry(
@@ -174,6 +191,10 @@ class DeviceAgent:
                 duration_ms=(time.monotonic() - start_time) * 1000,
             )
 
+        except _FailSafeException:
+            # Physical emergency stop — MUST propagate to caller
+            raise
+
         except Exception as e:
             logger.exception("Agent execution error")
             return AgentResult(
@@ -190,9 +211,9 @@ class DeviceAgent:
         if self._observer is not None:
             window_id = self._profile.metadata.get("window_id")
             if window_id is None:
-                logger.warning("No window_id in profile metadata, using full-screen capture")
-                return self._observer.capture_and_scale(window_id="0")
-            return self._observer.capture_and_scale(window_id=window_id)
+                logger.warning("No window_id in profile metadata, capturing full screen")
+                return self._observer.capture_full_screen()
+            return self._observer.capture_and_scale(window_id=str(window_id))
         return b""
 
     async def _observe(self, screenshot: bytes, task: str, step: int) -> str:

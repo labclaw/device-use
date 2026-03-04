@@ -80,6 +80,14 @@ class TestCoordinateScaler:
             assert abs(rx - vx) <= 1
             assert abs(ry - vy) <= 1
 
+    def test_zero_vlm_dims_raises(self):
+        with pytest.raises(ValueError, match="VLM dimensions"):
+            CoordinateScaler(vlm_width=0, vlm_height=800, screen_width=1920, screen_height=1080)
+
+    def test_zero_screen_dims_raises(self):
+        with pytest.raises(ValueError, match="Screen dimensions"):
+            CoordinateScaler(vlm_width=1280, vlm_height=800, screen_width=0, screen_height=1080)
+
     def test_clamp_screen(self):
         """Clamping keeps coordinates within window bounds."""
         scaler = CoordinateScaler(
@@ -133,6 +141,35 @@ class TestActionModels:
     def test_parse_unknown_raises(self):
         with pytest.raises(ValueError):
             parse_action({"action_type": "fly"})
+
+    def test_parse_nested_parameters(self):
+        """VLM returns fields nested under 'parameters' dict."""
+        action = parse_action({
+            "action_type": "type",
+            "parameters": {"text": "hello"},
+        })
+        assert isinstance(action, TypeAction)
+        assert action.text == "hello"
+
+    def test_parse_nested_parameters_with_coordinates(self):
+        """VLM returns coordinates + parameters nested."""
+        action = parse_action({
+            "action_type": "scroll",
+            "coordinates": [100, 200],
+            "parameters": {"clicks": -3},
+        })
+        assert isinstance(action, ScrollAction)
+        assert action.x == 100
+        assert action.y == 200
+        assert action.clicks == -3
+
+    def test_click_button_literal(self):
+        """ClickAction.button only accepts left, right, middle."""
+        a = ClickAction(x=0, y=0, button="right")
+        assert a.button == "right"
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            ClickAction(x=0, y=0, button="invalid")
 
 
 # --- Executor (with mocked pyautogui) ---
@@ -245,6 +282,36 @@ class TestActionExecutor:
         action = ClickAction(x=100, y=200)
         result = executor.execute(action)
         assert result.duration_ms >= 0
+
+    @patch("device_use.actions.executor.pyautogui")
+    def test_failsafe_exception_propagates(self, mock_pyautogui):
+        """pyautogui.FailSafeException must propagate (physical e-stop)."""
+        from pyautogui import FailSafeException
+        mock_pyautogui.click.side_effect = FailSafeException("corner")
+        executor = ActionExecutor(settle_delay=0)
+        action = ClickAction(x=100, y=200)
+        with pytest.raises(FailSafeException):
+            executor.execute(action)
+
+    @patch("device_use.actions.executor.pyautogui")
+    def test_scaled_coords_in_safety_request(self, mock_pyautogui):
+        """Safety check receives screen-space coordinates, not VLM-space."""
+        from device_use.safety.models import SafetyVerdict
+
+        scaler = CoordinateScaler(
+            vlm_width=1280, vlm_height=800,
+            screen_width=2560, screen_height=1600,
+        )
+        mock_guard = MagicMock()
+        mock_guard.check.return_value = SafetyVerdict(allowed=True)
+        executor = ActionExecutor(
+            safety_guard=mock_guard, scaler=scaler, settle_delay=0
+        )
+        action = ClickAction(x=100, y=100)
+        executor.execute(action)
+        # The ActionRequest passed to safety should have scaled coords
+        request = mock_guard.check.call_args[0][0]
+        assert request.coordinates == (200, 200)  # 100*2 = 200
 
 
 # --- Registry ---

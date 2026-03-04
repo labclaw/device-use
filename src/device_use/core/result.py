@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from device_use.core.models import ActionResult
 
@@ -21,6 +21,12 @@ class AgentResult(BaseModel):
     error: str = ""
     final_screenshot: bytes | None = None
 
+    @model_validator(mode="after")
+    def _check_consistency(self) -> AgentResult:
+        if not self.success and not self.error:
+            self.error = "Unknown failure"
+        return self
+
     @property
     def action_count(self) -> int:
         return len(self.actions)
@@ -28,5 +34,5 @@ class AgentResult(BaseModel):
     @property
     def success_rate(self) -> float:
         if not self.actions:
-            return 0.0
+            return 1.0 if self.success else 0.0
         return sum(1 for a in self.actions if a.success) / len(self.actions)

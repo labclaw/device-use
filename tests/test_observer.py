@@ -265,11 +265,13 @@ class TestScaleImage:
         assert img.width == 1280
         assert img.height == 720
 
-    def test_no_scale_small_image(self):
+    def test_upscale_small_image(self):
         png = _make_png(640, 480)
         scaled = ScreenObserver.scale_image(png, max_width=1280)
-        # Should return original bytes unchanged
-        assert scaled == png
+        # Small images are scaled up to max_width for consistent VLM coord space
+        img = Image.open(io.BytesIO(scaled))
+        assert img.width == 1280
+        assert img.height == 960
 
     def test_exact_max_width(self):
         png = _make_png(1280, 720)

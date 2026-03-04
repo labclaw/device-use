@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from typing import Any
 
 import backoff
@@ -97,7 +98,7 @@ class ClaudeBackend:
 
         response = await self._call(messages, system=self.system_prompt)
         try:
-            return json.loads(response)
+            return json.loads(_strip_markdown_fences(response))
         except json.JSONDecodeError:
             return {"description": response, "elements": []}
 
@@ -147,11 +148,12 @@ class ClaudeBackend:
 
         response = await self._call(messages, system=self.system_prompt)
         try:
-            return json.loads(response)
+            return json.loads(_strip_markdown_fences(response))
         except json.JSONDecodeError:
+            logger.warning("Failed to parse plan response as JSON: %s", response[:200])
             return {
                 "reasoning": response,
-                "action": {"action_type": "wait", "parameters": {"seconds": 1}},
+                "action": {"action_type": "wait", "seconds": 1},
                 "done": False,
                 "confidence": 0.0,
             }
@@ -178,10 +180,17 @@ class ClaudeBackend:
 
         response = await self._call(messages)
         try:
-            data = json.loads(response)
+            data = json.loads(_strip_markdown_fences(response))
             x, y = data.get("x"), data.get("y")
             if x is not None and y is not None:
                 return (int(x), int(y))
         except (json.JSONDecodeError, TypeError, ValueError):
             pass
         return None
+
+
+def _strip_markdown_fences(text: str) -> str:
+    """Strip ```json ... ``` markdown fences from VLM responses."""
+    stripped = re.sub(r"^```(?:json)?\s*\n?", "", text.strip())
+    stripped = re.sub(r"\n?```\s*$", "", stripped)
+    return stripped.strip()

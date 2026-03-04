@@ -106,7 +106,10 @@ class TestAgentHistory:
         assert messages[0]["role"] == "user"
         content = messages[0]["content"]
         assert any(c["type"] == "text" for c in content)
-        assert any(c["type"] == "image" for c in content)
+        img_parts = [c for c in content if c["type"] == "image"]
+        assert len(img_parts) == 1
+        assert img_parts[0]["source"]["type"] == "base64"
+        assert img_parts[0]["source"]["media_type"] == "image/png"
 
     def test_to_messages_no_screenshot(self):
         history = AgentHistory()
@@ -189,7 +192,7 @@ class TestAgentResult:
         )
         assert result.success is True
         assert result.action_count == 0
-        assert result.success_rate == 0.0
+        assert result.success_rate == 1.0  # success with no actions = 100%
 
     def test_with_actions(self):
         req = ActionRequest(action_type=ActionType.CLICK)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -9,8 +10,10 @@ import yaml
 
 from device_use.core.models import DeviceProfile
 
-# Built-in profiles ship alongside the package
-BUILTIN_PROFILES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "profiles"
+logger = logging.getLogger(__name__)
+
+# Built-in profiles ship inside the package (works in both editable and wheel installs)
+BUILTIN_PROFILES_DIR = Path(__file__).resolve().parent / "builtin"
 
 
 def load_profile(name_or_path: str | Path) -> DeviceProfile:
@@ -77,7 +80,8 @@ def list_profiles(profiles_dir: Path | None = None) -> list[dict[str, Any]]:
                 "software": profile.software,
                 "hardware_connected": profile.hardware_connected,
             })
-        except Exception:
+        except Exception as e:
+            logger.warning("Skipping broken profile %s: %s", yaml_file, e)
             continue
     return profiles
 

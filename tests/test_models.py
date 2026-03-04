@@ -151,6 +151,24 @@ class TestEnums:
             ActionType("invalid_action")
 
 
+class TestScreenDefinition:
+    def test_valid_screen(self):
+        s = ScreenDefinition(width=1920, height=1080)
+        assert s.width == 1920
+
+    def test_zero_width_raises(self):
+        with pytest.raises(ValidationError, match="must be > 0"):
+            ScreenDefinition(width=0, height=1080)
+
+    def test_zero_height_raises(self):
+        with pytest.raises(ValidationError, match="must be > 0"):
+            ScreenDefinition(width=1920, height=0)
+
+    def test_negative_width_raises(self):
+        with pytest.raises(ValidationError, match="must be > 0"):
+            ScreenDefinition(width=-100, height=1080)
+
+
 class TestValidation:
     def test_invalid_profile_missing_required(self):
         with pytest.raises(ValidationError):

@@ -69,14 +69,25 @@ class ScreenObserver:
 
         return result
 
+    def capture_full_screen(self, max_width: int = 1280) -> bytes:
+        """Capture the primary monitor (full screen) and scale for VLM input."""
+        with mss.mss() as sct:
+            monitor = sct.monitors[1]  # Primary monitor
+            shot = sct.grab(monitor)
+            img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return self.scale_image(buf.getvalue(), max_width)
+
     @staticmethod
     def scale_image(image_bytes: bytes, max_width: int = 1280) -> bytes:
-        """Scale PNG image bytes to max width, preserving aspect ratio.
+        """Scale PNG image bytes to exactly max_width, preserving aspect ratio.
 
-        If the image is already smaller than max_width, returns as-is.
+        Always resizes to ensure VLM coordinate space matches the scaler's
+        assumption (vlm_width == max_width).
         """
         img = Image.open(io.BytesIO(image_bytes))
-        if img.width <= max_width:
+        if img.width == max_width:
             return image_bytes
         ratio = max_width / img.width
         new_height = int(img.height * ratio)
