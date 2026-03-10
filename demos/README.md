@@ -1,4 +1,4 @@
-# Device-Use Demos — TopSpin AI Scientist
+# Device-Use Demos — Multi-Instrument AI Science
 
 ## Quick Start
 
@@ -16,6 +16,7 @@ python demos/topspin_batch.py
 python demos/topspin_ai_scientist.py   # full AI scientist pipeline
 python demos/topspin_blind_challenge.py # blind NMR identification quiz
 python demos/topspin_pipeline.py       # orchestrator middleware demo
+python demos/multi_instrument_demo.py  # NMR + plate reader together
 
 # 3. Web GUI
 ./demos/run_web.sh    # open http://localhost:8420
@@ -84,15 +85,27 @@ python demos/topspin_pipeline.py --dataset exam_CMCse_3 --expno 10
 
 Shows the core middleware pattern: instruments register with the orchestrator, pipelines define multi-step workflows declaratively, events stream to listeners. The demo runs a 4-step pipeline (process → visualize → interpret → PubChem) with real-time event logging.
 
+## Demo 7: Multi-Instrument Orchestration
+
+```bash
+python demos/multi_instrument_demo.py
+```
+
+The "ROS for Lab Instruments" demo — orchestrates TWO different instrument types through the same BaseInstrument abstraction:
+1. NMR Spectrometer (TopSpin) — chemical structure analysis
+2. Plate Reader (Gen5) — ELISA / cell viability assays
+
+Both instruments register with the same Orchestrator, share the same Pipeline engine. Shows Z-factor calculation, signal/noise ratios, and cross-instrument summaries.
+
 ## Architecture
 
 ```
 Cloud Brain (Claude / GPT / Gemini)
         ↕
    device-use middleware (this project)
-    ↕         ↕           ↕          ↕
- TopSpin   PubChem   ToolUniverse  K-Dense
-  (NMR)    (NCBI)    (Harvard)    (Analyst)
+    ↕         ↕         ↕            ↕          ↕
+ TopSpin   Plate     PubChem    ToolUniverse  K-Dense
+  (NMR)   Reader    (NCBI)     (Harvard)    (Analyst)
 ```
 
 Three control modes for the same instrument:

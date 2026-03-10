@@ -50,6 +50,23 @@ def main():
     )
     interactive_parser.add_argument("--model", "-m", help="Model name override")
 
+    # instruments — middleware layer
+    subparsers.add_parser(
+        "instruments", help="List registered instruments and tools"
+    )
+
+    # demo — run a demo pipeline
+    demo_parser = subparsers.add_parser(
+        "demo", help="Run a demo pipeline (nmr, plate-reader, multi)"
+    )
+    demo_parser.add_argument(
+        "name",
+        nargs="?",
+        default="multi",
+        choices=["nmr", "plate-reader", "multi"],
+        help="Demo to run (default: multi)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "list-profiles":
@@ -58,6 +75,10 @@ def main():
         asyncio.run(_run(args))
     elif args.command == "interactive":
         asyncio.run(_interactive(args))
+    elif args.command == "instruments":
+        _instruments()
+    elif args.command == "demo":
+        _demo(args.name)
     else:
         parser.print_help()
 
@@ -143,6 +164,45 @@ async def _interactive(args):
         )
         if result.error:
             print(f"  Error: {result.error}")
+
+
+def _instruments():
+    """Show registered instruments and their tools."""
+    from device_use.instruments import ControlMode
+    from device_use.instruments.nmr.adapter import TopSpinAdapter
+    from device_use.instruments.plate_reader import PlateReaderAdapter
+    from device_use.orchestrator import Orchestrator
+
+    orch = Orchestrator()
+    orch.register(TopSpinAdapter(mode=ControlMode.OFFLINE))
+    orch.register(PlateReaderAdapter(mode=ControlMode.OFFLINE))
+
+    instruments = orch.registry.list_instruments()
+    tools = orch.registry.list_tools()
+
+    print(f"\nInstruments ({len(instruments)}):")
+    print(f"  {'Name':<18} {'Vendor':<10} {'Type':<14} {'Modes'}")
+    print(f"  {'-'*60}")
+    for inst in instruments:
+        modes = ", ".join(m.value for m in inst.supported_modes)
+        print(f"  {inst.name:<18} {inst.vendor:<10} {inst.instrument_type:<14} {modes}")
+
+    print(f"\nTools ({len(tools)}):")
+    for tool in tools:
+        print(f"  {tool.name:<35} {tool.description}")
+
+
+def _demo(name: str):
+    """Run a demo pipeline."""
+    import subprocess
+
+    demo_map = {
+        "nmr": "demos/topspin_identify.py",
+        "plate-reader": "demos/multi_instrument_demo.py",
+        "multi": "demos/multi_instrument_demo.py",
+    }
+    script = demo_map[name]
+    subprocess.run([sys.executable, script])
 
 
 if __name__ == "__main__":
