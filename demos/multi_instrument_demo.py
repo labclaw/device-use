@@ -149,6 +149,15 @@ def main():
         print(f"    Positive ctrl: {pos.value:.0f} RFU")
         print(f"    Negative ctrl: {neg.value:.0f} RFU")
         print(f"    Z-factor: {_z_factor(viab):.2f}")
+
+        # Generate heatmap plots
+        try:
+            from device_use.instruments.plate_reader.visualizer import plot_plate_heatmap
+            plot_plate_heatmap(elisa, output_path="output/elisa_heatmap.png")
+            plot_plate_heatmap(viab, output_path="output/viability_heatmap.png")
+            print(f"\n  Plots saved: output/elisa_heatmap.png, output/viability_heatmap.png")
+        except Exception:
+            pass  # matplotlib not required
     else:
         print(f"  Plate reader pipeline failed: {reader_result.steps[-1][1].error}")
 

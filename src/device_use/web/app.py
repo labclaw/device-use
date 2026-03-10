@@ -278,6 +278,11 @@ def plate_reader_process(name: str):
             row_data.append(round(well.value, 4) if well else 0)
         heatmap.append(row_data)
 
+    # Generate heatmap plot
+    from device_use.instruments.plate_reader.visualizer import plot_plate_heatmap
+    png_bytes = plot_plate_heatmap(reading, output_path=None)
+    plot_b64 = base64.b64encode(png_bytes).decode()
+
     return {
         "name": name,
         "protocol": reading.protocol,
@@ -287,6 +292,7 @@ def plate_reader_process(name: str):
         "rows": rows,
         "cols": cols,
         "heatmap": heatmap,
+        "plot_base64": plot_b64,
         "metadata": reading.metadata,
         "processing_time_s": round(dt, 4),
     }
@@ -574,6 +580,7 @@ _INDEX_HTML = """\
       </div>
     </div>
     <div class="meta-grid" id="plateMeta"></div>
+    <img class="spectrum-img" id="platePlotImg" style="display:none;" />
     <div id="plateHeatmap" style="margin: 1rem 0;"></div>
   </div>
 </div>
@@ -793,6 +800,7 @@ async function selectPlate(name) {
   document.getElementById('plateTitle').textContent = name;
   document.getElementById('plateMeta').innerHTML = '<span class="loading">Processing...</span>';
   document.getElementById('plateHeatmap').innerHTML = '';
+  document.getElementById('platePlotImg').style.display = 'none';
 
   try {
     const res = await fetch(`/api/plate-reader/process/${encodeURIComponent(name)}`);
@@ -805,7 +813,14 @@ async function selectPlate(name) {
       <div class="meta-item"><div class="meta-label">Wells</div><div class="meta-value">${data.wells}</div></div>
     `;
 
-    // Render heatmap
+    // Show matplotlib plot
+    if (data.plot_base64) {
+      const plotImg = document.getElementById('platePlotImg');
+      plotImg.src = 'data:image/png;base64,' + data.plot_base64;
+      plotImg.style.display = 'block';
+    }
+
+    // Render interactive heatmap
     const vals = data.heatmap.flat();
     const maxVal = Math.max(...vals);
     const minVal = Math.min(...vals);
