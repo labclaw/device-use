@@ -129,7 +129,16 @@ class TestPlateReaderAdapter:
         blank = reading.plate.get_well("A12")
         standard = reading.plate.get_well("A1")
         assert standard.value > blank.value
-        assert blank.blank_corrected is not None
+
+        # All wells should have blank_corrected set
+        for w in reading.plate.wells:
+            assert w.blank_corrected is not None
+
+        # blank_corrected = value - blank_avg
+        blank_wells = [w for w in reading.plate.wells if w.col >= 11]
+        blank_avg = sum(w.value for w in blank_wells) / len(blank_wells)
+        sample = reading.plate.get_well("C5")
+        assert abs(sample.blank_corrected - (sample.value - blank_avg)) < 1e-3
 
     def test_csv_export(self):
         adapter = PlateReaderAdapter(mode=ControlMode.OFFLINE)

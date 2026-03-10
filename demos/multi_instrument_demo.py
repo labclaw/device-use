@@ -16,6 +16,7 @@ Usage:
     python demos/multi_instrument_demo.py
 """
 
+import statistics
 import sys
 from pathlib import Path
 
@@ -204,13 +205,15 @@ def _z_factor(reading):
     pos_vals = [w.value for w in pos_wells]
     neg_vals = [w.value for w in neg_wells]
 
-    import statistics
     pos_mean = statistics.mean(pos_vals)
     neg_mean = statistics.mean(neg_vals)
     pos_std = statistics.stdev(pos_vals)
     neg_std = statistics.stdev(neg_vals)
 
-    return 1 - 3 * (pos_std + neg_std) / abs(pos_mean - neg_mean)
+    separation = abs(pos_mean - neg_mean)
+    if separation == 0:
+        return float("-inf")
+    return 1 - 3 * (pos_std + neg_std) / separation
 
 
 if __name__ == "__main__":

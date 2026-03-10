@@ -57,11 +57,11 @@ def _generate_demo_absorbance(wavelength: int = 450) -> PlateReading:
             wells.append(Well(row=r, col=c, value=round(max(0, value), 4)))
 
     # Blank correction
-    blank_avg = sum(w.value for w in wells if w.col >= 11) / sum(
-        1 for w in wells if w.col >= 11
-    )
-    for w in wells:
-        w.blank_corrected = round(w.value - blank_avg, 4)
+    blank_wells = [w for w in wells if w.col >= 11]
+    if blank_wells:
+        blank_avg = sum(w.value for w in blank_wells) / len(blank_wells)
+        for w in wells:
+            w.blank_corrected = round(w.value - blank_avg, 4)
 
     plate = WellPlate(format=PlateFormat.PLATE_96, wells=wells)
     return PlateReading(
