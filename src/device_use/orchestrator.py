@@ -1,0 +1,459 @@
+"""Orchestrator — the middleware that connects AI brains to physical instruments.
+
+Architecture:
+    Cloud Brain (Claude, GPT, etc.)
+            |
+       Orchestrator  <-- this module
+            |
+    Instruments (NMR, Microscope, etc.)
+
+The Orchestrator handles:
+  1. Registry — instruments register themselves, orchestrator discovers them
+  2. Pipelines — multi-step workflows (load -> process -> analyze -> recommend)
+  3. Tool routing — route brain requests to the right instrument
+  4. Events — steps emit events for logging/display
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable
+
+from device_use.instruments.base import BaseInstrument, InstrumentInfo
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Events
+# ---------------------------------------------------------------------------
+
+class EventType(str, Enum):
+    """Event types emitted during pipeline execution."""
+    PIPELINE_START = "pipeline_start"
+    PIPELINE_END = "pipeline_end"
+    STEP_START = "step_start"
+    STEP_END = "step_end"
+    STEP_ERROR = "step_error"
+    INSTRUMENT_REGISTERED = "instrument_registered"
+    INSTRUMENT_CONNECTED = "instrument_connected"
+    TOOL_CALLED = "tool_called"
+
+
+@dataclass
+class Event:
+    """An event emitted during orchestration."""
+    event_type: EventType
+    data: dict[str, Any] = field(default_factory=dict)
+    timestamp: float = field(default_factory=time.time)
+
+
+# Listener is any callable that accepts an Event
+EventListener = Callable[[Event], None]
+
+
+# ---------------------------------------------------------------------------
+# Tool Registry
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ToolSpec:
+    """A tool that can be called by the brain.
+
+    Tools wrap instrument capabilities (e.g. "nmr.process", "nmr.list_datasets")
+    into a flat namespace the brain can reference.
+    """
+    name: str
+    description: str
+    handler: Callable[..., Any]
+    instrument_type: str = ""  # which instrument type this belongs to
+    parameters: dict[str, str] = field(default_factory=dict)  # param_name -> description
+
+
+class ToolRegistry:
+    """Registry of available tools/instruments.
+
+    Instruments register themselves and their tools. The orchestrator
+    (and the brain) can look up tools by name or by instrument type.
+    """
+
+    def __init__(self) -> None:
+        self._instruments: dict[str, BaseInstrument] = {}  # name -> instrument
+        self._tools: dict[str, ToolSpec] = {}  # tool_name -> spec
+        self._listeners: list[EventListener] = []
+
+    def add_listener(self, listener: EventListener) -> None:
+        self._listeners.append(listener)
+
+    def _emit(self, event: Event) -> None:
+        for listener in self._listeners:
+            try:
+                listener(event)
+            except Exception:
+                logger.exception("Event listener failed")
+
+    # -- Instrument registration --
+
+    def register_instrument(self, instrument: BaseInstrument) -> None:
+        """Register an instrument and auto-register its standard tools."""
+        info = instrument.info()
+        self._instruments[info.name] = instrument
+
+        # Auto-register standard BaseInstrument methods as tools
+        prefix = info.name.lower().replace(" ", "_")
+
+        self._register_tool(ToolSpec(
+            name=f"{prefix}.list_datasets",
+            description=f"List available datasets on {info.name}",
+            handler=instrument.list_datasets,
+            instrument_type=info.instrument_type,
+        ))
+        self._register_tool(ToolSpec(
+            name=f"{prefix}.acquire",
+            description=f"Acquire data from {info.name}",
+            handler=instrument.acquire,
+            instrument_type=info.instrument_type,
+            parameters={"kwargs": "Acquisition parameters"},
+        ))
+        self._register_tool(ToolSpec(
+            name=f"{prefix}.process",
+            description=f"Process data from {info.name}",
+            handler=instrument.process,
+            instrument_type=info.instrument_type,
+            parameters={"data_path": "Path to raw data"},
+        ))
+
+        self._emit(Event(
+            event_type=EventType.INSTRUMENT_REGISTERED,
+            data={"instrument": info.name, "type": info.instrument_type},
+        ))
+        logger.info("Registered instrument: %s (%s)", info.name, info.instrument_type)
+
+    def _register_tool(self, spec: ToolSpec) -> None:
+        """Register a single tool spec."""
+        self._tools[spec.name] = spec
+
+    def register_tool(self, spec: ToolSpec) -> None:
+        """Register a custom tool (not tied to standard instrument methods)."""
+        self._register_tool(spec)
+
+    # -- Lookups --
+
+    def get_instrument(self, name: str) -> BaseInstrument | None:
+        return self._instruments.get(name)
+
+    def get_tool(self, name: str) -> ToolSpec | None:
+        return self._tools.get(name)
+
+    def list_instruments(self) -> list[InstrumentInfo]:
+        return [inst.info() for inst in self._instruments.values()]
+
+    def list_tools(self) -> list[ToolSpec]:
+        return list(self._tools.values())
+
+    def tools_for_type(self, instrument_type: str) -> list[ToolSpec]:
+        """List tools belonging to a specific instrument type (e.g. 'nmr')."""
+        return [t for t in self._tools.values() if t.instrument_type == instrument_type]
+
+
+# ---------------------------------------------------------------------------
+# Pipeline
+# ---------------------------------------------------------------------------
+
+class StepStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+@dataclass
+class StepResult:
+    """Result of executing a single pipeline step."""
+    status: StepStatus
+    output: Any = None
+    error: str = ""
+    duration_ms: float = 0
+
+
+@dataclass
+class PipelineStep:
+    """A single step in a pipeline.
+
+    A step can either:
+      - Call a registered tool by name (tool_name + params), or
+      - Run an arbitrary callable (handler)
+
+    If both are provided, tool_name takes priority.
+    """
+    name: str
+    description: str = ""
+    tool_name: str = ""  # registered tool to call
+    handler: Callable[..., Any] | None = None  # or an inline callable
+    params: dict[str, Any] = field(default_factory=dict)
+    condition: Callable[[dict[str, Any]], bool] | None = None  # skip if returns False
+
+
+@dataclass
+class PipelineResult:
+    """Result of running an entire pipeline."""
+    name: str
+    steps: list[tuple[str, StepResult]] = field(default_factory=list)  # (step_name, result)
+    duration_ms: float = 0
+
+    @property
+    def success(self) -> bool:
+        return all(r.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
+                   for _, r in self.steps)
+
+    @property
+    def outputs(self) -> dict[str, Any]:
+        """Map of step_name -> output for all completed steps."""
+        return {name: r.output for name, r in self.steps
+                if r.status == StepStatus.COMPLETED and r.output is not None}
+
+    @property
+    def last_output(self) -> Any:
+        """Output of the last completed step."""
+        for _, r in reversed(self.steps):
+            if r.status == StepStatus.COMPLETED and r.output is not None:
+                return r.output
+        return None
+
+
+class Pipeline:
+    """A sequence of steps to execute.
+
+    Steps run sequentially. Each step receives a context dict containing
+    outputs from all prior steps (keyed by step name). This lets later
+    steps reference earlier results without tight coupling.
+
+    Example:
+        pipeline = Pipeline("nmr_analysis")
+        pipeline.add_step(PipelineStep(
+            name="load",
+            tool_name="topspin.process",
+            params={"data_path": "/data/ethanol/1"},
+        ))
+        pipeline.add_step(PipelineStep(
+            name="analyze",
+            handler=brain.interpret_spectrum,
+            params={"molecular_formula": "C2H6O"},
+        ))
+    """
+
+    def __init__(self, name: str, description: str = "") -> None:
+        self.name = name
+        self.description = description
+        self.steps: list[PipelineStep] = []
+
+    def add_step(self, step: PipelineStep) -> Pipeline:
+        """Add a step. Returns self for chaining."""
+        self.steps.append(step)
+        return self
+
+    def __len__(self) -> int:
+        return len(self.steps)
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
+
+class Orchestrator:
+    """The main coordinator — connects brains to instruments via pipelines.
+
+    Usage:
+        orch = Orchestrator()
+
+        # Register instruments
+        nmr = TopSpinAdapter(mode="offline")
+        nmr.connect()
+        orch.registry.register_instrument(nmr)
+
+        # Build a pipeline
+        pipeline = Pipeline("analyze_sample")
+        pipeline.add_step(PipelineStep(
+            name="process",
+            tool_name="topspin.process",
+            params={"data_path": "/data/ethanol/1"},
+        ))
+        pipeline.add_step(PipelineStep(
+            name="interpret",
+            handler=lambda ctx: brain.interpret_spectrum(ctx["process"]),
+        ))
+
+        # Run it
+        result = orch.run(pipeline)
+    """
+
+    def __init__(self, registry: ToolRegistry | None = None) -> None:
+        self.registry = registry or ToolRegistry()
+        self._listeners: list[EventListener] = []
+
+    # -- Event system --
+
+    def on_event(self, listener: EventListener) -> None:
+        """Register an event listener."""
+        self._listeners.append(listener)
+        self.registry.add_listener(listener)
+
+    def _emit(self, event: Event) -> None:
+        for listener in self._listeners:
+            try:
+                listener(event)
+            except Exception:
+                logger.exception("Event listener failed")
+
+    # -- Instrument convenience --
+
+    def register(self, instrument: BaseInstrument) -> None:
+        """Register an instrument (shorthand for registry.register_instrument)."""
+        self.registry.register_instrument(instrument)
+
+    def connect_all(self) -> dict[str, bool]:
+        """Try to connect all registered instruments. Returns name -> success."""
+        results: dict[str, bool] = {}
+        for info in self.registry.list_instruments():
+            inst = self.registry.get_instrument(info.name)
+            if inst is None:
+                continue
+            ok = inst.connect()
+            results[info.name] = ok
+            if ok:
+                self._emit(Event(
+                    event_type=EventType.INSTRUMENT_CONNECTED,
+                    data={"instrument": info.name},
+                ))
+                logger.info("Connected: %s", info.name)
+            else:
+                logger.warning("Failed to connect: %s", info.name)
+        return results
+
+    # -- Tool routing --
+
+    def call_tool(self, tool_name: str, **kwargs: Any) -> Any:
+        """Call a registered tool by name. Raises KeyError if not found."""
+        spec = self.registry.get_tool(tool_name)
+        if spec is None:
+            available = [t.name for t in self.registry.list_tools()]
+            raise KeyError(
+                f"Tool {tool_name!r} not found. Available: {available}"
+            )
+        self._emit(Event(
+            event_type=EventType.TOOL_CALLED,
+            data={"tool": tool_name, "params": kwargs},
+        ))
+        return spec.handler(**kwargs)
+
+    # -- Pipeline execution --
+
+    def run(self, pipeline: Pipeline) -> PipelineResult:
+        """Execute a pipeline, passing context between steps.
+
+        Each step's handler/tool receives the accumulated context dict
+        as its first argument (if the handler accepts it) or as keyword
+        params merged with step.params.
+
+        For tool calls: step.params are passed as kwargs to the tool handler.
+        For inline handlers: the handler is called with (context, **params).
+        """
+        self._emit(Event(
+            event_type=EventType.PIPELINE_START,
+            data={"pipeline": pipeline.name, "steps": len(pipeline)},
+        ))
+
+        context: dict[str, Any] = {}
+        result = PipelineResult(name=pipeline.name)
+        pipeline_start = time.monotonic()
+
+        for step in pipeline.steps:
+            # Condition check — skip step if condition returns False
+            if step.condition is not None and not step.condition(context):
+                step_result = StepResult(status=StepStatus.SKIPPED)
+                result.steps.append((step.name, step_result))
+                logger.info("Skipped step: %s", step.name)
+                continue
+
+            self._emit(Event(
+                event_type=EventType.STEP_START,
+                data={
+                    "pipeline": pipeline.name,
+                    "step": step.name,
+                    "description": step.description,
+                },
+            ))
+
+            step_start = time.monotonic()
+            try:
+                output = self._execute_step(step, context)
+                duration_ms = (time.monotonic() - step_start) * 1000
+                step_result = StepResult(
+                    status=StepStatus.COMPLETED,
+                    output=output,
+                    duration_ms=duration_ms,
+                )
+                context[step.name] = output
+
+                self._emit(Event(
+                    event_type=EventType.STEP_END,
+                    data={
+                        "pipeline": pipeline.name,
+                        "step": step.name,
+                        "duration_ms": duration_ms,
+                    },
+                ))
+                logger.info("Completed step: %s (%.0fms)", step.name, duration_ms)
+
+            except Exception as exc:
+                duration_ms = (time.monotonic() - step_start) * 1000
+                step_result = StepResult(
+                    status=StepStatus.FAILED,
+                    error=str(exc),
+                    duration_ms=duration_ms,
+                )
+                self._emit(Event(
+                    event_type=EventType.STEP_ERROR,
+                    data={
+                        "pipeline": pipeline.name,
+                        "step": step.name,
+                        "error": str(exc),
+                    },
+                ))
+                logger.error("Step %s failed: %s", step.name, exc)
+                result.steps.append((step.name, step_result))
+                break  # stop pipeline on first failure
+
+            result.steps.append((step.name, step_result))
+
+        result.duration_ms = (time.monotonic() - pipeline_start) * 1000
+
+        self._emit(Event(
+            event_type=EventType.PIPELINE_END,
+            data={
+                "pipeline": pipeline.name,
+                "success": result.success,
+                "duration_ms": result.duration_ms,
+            },
+        ))
+        return result
+
+    def _execute_step(self, step: PipelineStep, context: dict[str, Any]) -> Any:
+        """Execute a single step, resolving tool or inline handler."""
+        params = dict(step.params)  # defensive copy
+
+        if step.tool_name:
+            # Route to registered tool
+            return self.call_tool(step.tool_name, **params)
+
+        if step.handler is not None:
+            # Inline handler — pass context as first arg
+            return step.handler(context, **params)
+
+        raise ValueError(
+            f"Step {step.name!r} has neither tool_name nor handler"
+        )
