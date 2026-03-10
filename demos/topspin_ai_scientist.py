@@ -207,7 +207,7 @@ def main():
             iupac = result.get("IUPACName", "?")
             formula = result.get("MolecularFormula", "?")
             weight = result.get("MolecularWeight", "?")
-            smiles = result.get("CanonicalSMILES", "?")
+            smiles = result.get("CanonicalSMILES") or result.get("SMILES", "?")
 
             print(f"{GREEN}verified{RESET} {DIM}({dt:.1f}s){RESET}")
             print(f"    CID:     {BOLD}{cid}{RESET}")
