@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.nmr.processor import NMRProcessor
+from device_use.instruments.plate_reader import PlateReaderAdapter
 from device_use.orchestrator import Orchestrator
 
 logger = logging.getLogger(__name__)
@@ -69,8 +70,8 @@ def _get_orchestrator() -> Orchestrator:
     global _orchestrator
     if _orchestrator is None:
         _orchestrator = Orchestrator()
-        adapter = _get_adapter()
-        _orchestrator.register(adapter)
+        _orchestrator.register(_get_adapter())
+        _orchestrator.register(PlateReaderAdapter())
     return _orchestrator
 
 
@@ -232,6 +233,7 @@ def get_architecture():
              "status": "active"},
             {"name": "Instruments", "components": [
                 {"name": "TopSpin NMR", "modes": ["API", "GUI", "Offline"], "status": "connected"},
+                {"name": "Plate Reader", "modes": ["Offline", "API", "GUI"], "status": "connected"},
             ]},
             {"name": "Tools", "components": [
                 {"name": "PubChem", "status": "active"},
