@@ -163,3 +163,34 @@ class TestMultiInstrumentPipeline:
         assert result.success
         assert result.steps[1][1].status == StepStatus.COMPLETED
         assert result.steps[2][1].status == StepStatus.SKIPPED
+
+
+class TestInstrumentTemplate:
+    """Verify the template adapter works with the orchestrator."""
+
+    def test_template_registers(self):
+        from device_use.instruments.template import InstrumentTemplate
+
+        orch = Orchestrator()
+        template = InstrumentTemplate()
+        orch.register(template)
+
+        instruments = orch.registry.list_instruments()
+        assert len(instruments) == 1
+        assert instruments[0].name == "MyInstrument"
+
+        tools = orch.registry.list_tools()
+        assert len(tools) == 3  # list_datasets, acquire, process
+
+    def test_three_instruments_together(self):
+        """Three instrument types can coexist."""
+        from device_use.instruments.template import InstrumentTemplate
+
+        orch = Orchestrator()
+        orch.register(TopSpinAdapter(mode=ControlMode.OFFLINE))
+        orch.register(PlateReaderAdapter(mode=ControlMode.OFFLINE))
+        orch.register(InstrumentTemplate())
+
+        instruments = orch.registry.list_instruments()
+        assert len(instruments) == 3
+        assert len(orch.registry.list_tools()) == 9
