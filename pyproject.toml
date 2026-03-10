@@ -37,6 +37,7 @@ tools = [
 ]
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
 ]
 
@@ -51,6 +52,7 @@ packages = ["src/device_use"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 markers = [
     "network: tests that require network access (deselect with -m 'not network')",
 ]

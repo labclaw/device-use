@@ -18,6 +18,11 @@ from device_use.core.window_manager import WindowInfo, WindowManager
 # Fixtures and helpers
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _force_linux_platform(monkeypatch):
+    """WindowManager is Linux-only; mock platform so tests run on macOS/Windows."""
+    monkeypatch.setattr("device_use.core.window_manager.platform.system", lambda: "Linux")
+
 WMCTRL_OUTPUT = """\
 0x04000007  0 0    51  1920 1029 myhost Terminal
 0x04800003  0 100  200 800  600  myhost FIJI - ImageJ 2.14.0
