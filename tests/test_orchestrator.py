@@ -1,11 +1,6 @@
 """Tests for the Orchestrator middleware (registry, pipelines, events)."""
 
-import sys
-from pathlib import Path
-
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from device_use.instruments.base import BaseInstrument, ControlMode, InstrumentInfo
 from device_use.orchestrator import (
