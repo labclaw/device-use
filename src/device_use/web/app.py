@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.nmr.processor import NMRProcessor
+from device_use.orchestrator import Orchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Singleton adapter
+# Singletons
 _adapter: TopSpinAdapter | None = None
+_orchestrator: Orchestrator | None = None
 
 
 def _get_adapter() -> TopSpinAdapter:
@@ -63,12 +65,26 @@ def _get_adapter() -> TopSpinAdapter:
     return _adapter
 
 
+def _get_orchestrator() -> Orchestrator:
+    global _orchestrator
+    if _orchestrator is None:
+        _orchestrator = Orchestrator()
+        adapter = _get_adapter()
+        _orchestrator.register(adapter)
+    return _orchestrator
+
+
 # ── API Endpoints ──────────────────────────────────────────────
 
 @app.get("/api/status")
 def get_status():
+    orch = _get_orchestrator()
     adapter = _get_adapter()
     info = adapter.info()
+
+    instruments = orch.registry.list_instruments()
+    tools = orch.registry.list_tools()
+
     return {
         "instrument": info.name,
         "vendor": info.vendor,
@@ -76,6 +92,10 @@ def get_status():
         "mode": adapter.mode.value,
         "connected": adapter.connected,
         "supported_modes": [m.value for m in info.supported_modes],
+        "orchestrator": {
+            "instruments": len(instruments),
+            "registered_tools": [t.name for t in tools],
+        },
     }
 
 
@@ -235,6 +255,7 @@ _INDEX_HTML = """\
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Device-Use | AI Scientist</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root {
     --bg: #0a0a1a;
@@ -370,13 +391,21 @@ _INDEX_HTML = """\
     border-radius: 8px;
     padding: 1.5rem;
     margin-top: 1rem;
-    white-space: pre-wrap;
     line-height: 1.6;
     font-size: 0.9rem;
     max-height: 600px;
     overflow-y: auto;
   }
-  .ai-panel h2 { color: var(--accent); margin: 1rem 0 0.5rem; }
+  .ai-panel h2 { color: var(--accent); margin: 1rem 0 0.5rem; font-size: 1.1rem; }
+  .ai-panel h3 { color: var(--green); margin: 0.8rem 0 0.4rem; font-size: 0.95rem; }
+  .ai-panel table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.8rem; }
+  .ai-panel th { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 2px solid var(--border); color: var(--accent); }
+  .ai-panel td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+  .ai-panel strong { color: var(--green); }
+  .ai-panel code { background: rgba(255,255,255,0.05); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; }
+  .ai-panel ul, .ai-panel ol { margin: 0.3rem 0; padding-left: 1.5rem; }
+  .ai-panel li { margin: 0.2rem 0; }
+  .ai-panel p { margin: 0.4rem 0; }
 
   /* Buttons */
   .btn {
@@ -567,11 +596,18 @@ async function runAnalysis() {
       const data = JSON.parse(event.data);
       if (data.type === 'chunk') {
         text += data.text;
-        panel.innerHTML = text.replace(/## /g, '<h2>').replace(/\\n/g, '\\n');
+        if (typeof marked !== 'undefined') {
+          panel.innerHTML = marked.parse(text);
+        } else {
+          panel.innerText = text;
+        }
+        panel.scrollTop = panel.scrollHeight;
       } else if (data.type === 'done') {
         es.close();
         document.getElementById('btnAnalyze').disabled = false;
-        panel.innerHTML += `\\n\\n<span style="color:var(--dim);">(${data.time_s}s)</span>`;
+        if (typeof marked !== 'undefined') {
+          panel.innerHTML = marked.parse(text) + `<p style="color:var(--dim);margin-top:1rem;">(${data.time_s}s)</p>`;
+        }
       } else if (data.type === 'error') {
         es.close();
         document.getElementById('btnAnalyze').disabled = false;
@@ -621,13 +657,17 @@ async function runPubchem() {
 
     const panel = document.getElementById('aiPanel');
     panel.style.display = 'block';
-    panel.innerHTML = `<h2>PubChem Result</h2>
-CID: ${data.CID}
-IUPAC: ${data.IUPACName || 'N/A'}
-Formula: ${data.MolecularFormula || 'N/A'}
-Weight: ${data.MolecularWeight || 'N/A'}
-SMILES: ${data.CanonicalSMILES || data.SMILES || 'N/A'}
-InChI: ${data.InChI || 'N/A'}`;
+    const md = `## PubChem Result
+
+| Property | Value |
+|---|---|
+| **CID** | ${data.CID} |
+| **IUPAC** | ${data.IUPACName || 'N/A'} |
+| **Formula** | ${data.MolecularFormula || 'N/A'} |
+| **Weight** | ${data.MolecularWeight || 'N/A'} |
+| **SMILES** | ${data.CanonicalSMILES || data.SMILES || 'N/A'} |
+| **InChIKey** | ${data.InChIKey || 'N/A'} |`;
+    panel.innerHTML = typeof marked !== 'undefined' ? marked.parse(md) : md;
   } catch (e) {
     const panel = document.getElementById('aiPanel');
     panel.style.display = 'block';
