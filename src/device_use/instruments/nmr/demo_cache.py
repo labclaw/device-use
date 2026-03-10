@@ -195,6 +195,58 @@ After HSQC, proceed to **HMBC** for long-range correlations to confirm connectiv
 }
 
 
+_DNMR_ANALYSIS = """\
+## Dynamic NMR Analysis: N,N-Dimethylacetamide (DMA)
+
+### Temperature-Dependent Behavior
+
+The variable-temperature 1H NMR spectra of N,N-dimethylacetamide reveal the classic \
+signature of restricted rotation about the amide C–N bond:
+
+| Temperature | N-Methyl Region | Interpretation |
+|---|---|---|
+| 283 K (T=10) | Two distinct singlets (~2.9, ~3.0 ppm) | **Slow exchange** — rotation frozen on NMR timescale |
+| 320 K | Two peaks, slightly broadened | Approaching coalescence |
+| 350 K | Broad, coalescing peaks | **Near coalescence temperature (Tc)** |
+| 370 K | Single broad peak | Just past coalescence |
+| 420 K | Sharp singlet | **Fast exchange** — free rotation |
+
+### Physical Chemistry
+
+The amide bond in DMA has partial double-bond character (~40% C=N) due to \
+nitrogen lone pair delocalization into the carbonyl π* orbital. This creates \
+a rotational barrier (ΔG‡ ≈ 70–75 kJ/mol) that:
+
+1. At **low temperature**: Freezes the two N-methyl groups in distinct \
+environments (cis vs trans to C=O), giving two NMR peaks
+2. At **coalescence**: Exchange rate matches the frequency difference between peaks
+3. At **high temperature**: Rapid rotation averages the two environments
+
+### Barrier Calculation
+
+From the coalescence temperature (Tc ≈ 350 K) and the chemical shift \
+difference (Δν ≈ 40 Hz at 400 MHz):
+
+- **k(Tc) = π × Δν / √2 ≈ 89 s⁻¹**
+- **ΔG‡ = R × Tc × [22.96 + ln(Tc/Δν)] ≈ 73 kJ/mol**
+
+This is consistent with the literature value of 71–75 kJ/mol for DMA.
+
+### Significance
+
+This DNMR experiment is a cornerstone of physical organic chemistry education, \
+demonstrating that NMR can measure reaction rates and activation energies for \
+processes occurring on the millisecond timescale. The device-use middleware \
+makes this experiment fully automatable — from temperature control to data \
+acquisition to barrier calculation.\
+"""
+
+
+def get_dnmr_analysis() -> str:
+    """Return cached DNMR temperature series analysis."""
+    return _DNMR_ANALYSIS
+
+
 def find_cached_response(
     compound_name: str,
     response_type: str = "interpret",
