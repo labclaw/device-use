@@ -184,6 +184,43 @@ def pubchem_lookup(name: str):
         raise HTTPException(404, str(e))
 
 
+@app.get("/api/tools")
+def list_tools():
+    """List available external tools."""
+    from device_use.tools.tooluniverse import get_available_tools
+
+    tools = get_available_tools()
+    return {
+        "tools": [
+            {"name": t.name, "description": t.description}
+            for t in tools
+        ],
+        "count": len(tools),
+    }
+
+
+@app.get("/api/architecture")
+def get_architecture():
+    """Return the device-use architecture overview."""
+    from device_use.tools.tooluniverse import _TU_AVAILABLE
+
+    return {
+        "layers": [
+            {"name": "Cloud Brain", "components": ["Claude AI", "GPT", "Gemini"],
+             "status": "active"},
+            {"name": "device-use middleware", "components": ["Orchestrator", "Event System"],
+             "status": "active"},
+            {"name": "Instruments", "components": [
+                {"name": "TopSpin NMR", "modes": ["API", "GUI", "Offline"], "status": "connected"},
+            ]},
+            {"name": "Tools", "components": [
+                {"name": "PubChem", "status": "active"},
+                {"name": "ToolUniverse", "status": "active" if _TU_AVAILABLE else "available"},
+            ]},
+        ],
+    }
+
+
 # ── Frontend ──────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -384,6 +421,7 @@ _INDEX_HTML = """\
   <div class="header">
     <h1>DEVICE-USE</h1>
     <div class="subtitle">ROS for Lab Instruments — AI meets Physical Science</div>
+    <div class="subtitle" style="margin-top: 0.3rem; font-size: 0.75rem; opacity: 0.5;">Cloud Brain ↔ device-use middleware ↔ TopSpin · PubChem · ToolUniverse</div>
   </div>
 
   <div class="status-bar" id="statusBar">
@@ -404,7 +442,8 @@ _INDEX_HTML = """\
       </div>
       <div class="btn-row">
         <button class="btn" id="btnAnalyze" onclick="runAnalysis()">AI Analysis</button>
-        <button class="btn" id="btnPubchem" onclick="runPubchem()">PubChem Lookup</button>
+        <button class="btn" id="btnPubchem" onclick="runPubchem()">PubChem</button>
+        <button class="btn" id="btnTools" onclick="showTools()">Tools</button>
       </div>
     </div>
 
@@ -547,6 +586,23 @@ async function runAnalysis() {
   } catch (e) {
     panel.innerHTML = `<span style="color:red;">Error: ${e.message}</span>`;
     document.getElementById('btnAnalyze').disabled = false;
+  }
+}
+
+async function showTools() {
+  try {
+    const res = await fetch('/api/tools');
+    const data = await res.json();
+    const panel = document.getElementById('aiPanel');
+    panel.style.display = 'block';
+    let html = '<h2>Available Tools (' + data.count + ')</h2>\\n';
+    data.tools.forEach(t => {
+      html += '\\n<span style="color:var(--green);">▸ ' + t.name + '</span>\\n  ' + t.description + '\\n';
+    });
+    html += '\\n<span style="color:var(--dim);">Install more: pip install tooluniverse (600+ scientific tools)</span>';
+    panel.innerHTML = html;
+  } catch (e) {
+    console.error('Failed to load tools:', e);
   }
 }
 
