@@ -443,8 +443,13 @@ class Orchestrator:
         return result
 
     def _execute_step(self, step: PipelineStep, context: dict[str, Any]) -> Any:
-        """Execute a single step, resolving tool or inline handler."""
-        params = dict(step.params)  # defensive copy
+        """Execute a single step, resolving tool or inline handler.
+
+        For tool steps, params are resolved against context: any param value
+        that is a string like "{step_name}" is replaced with that step's output.
+        For handler steps, context is passed as the first argument.
+        """
+        params = self._resolve_params(step.params, context)
 
         if step.tool_name:
             # Route to registered tool
@@ -457,3 +462,24 @@ class Orchestrator:
         raise ValueError(
             f"Step {step.name!r} has neither tool_name nor handler"
         )
+
+    @staticmethod
+    def _resolve_params(
+        params: dict[str, Any], context: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Resolve param values against pipeline context.
+
+        String values matching "{step_name}" are replaced with the output
+        of that step. All other values pass through unchanged.
+        """
+        resolved = {}
+        for key, value in params.items():
+            if isinstance(value, str) and value.startswith("{") and value.endswith("}"):
+                ref = value[1:-1]
+                if ref in context:
+                    resolved[key] = context[ref]
+                else:
+                    resolved[key] = value  # keep as-is if not found
+            else:
+                resolved[key] = value
+        return resolved

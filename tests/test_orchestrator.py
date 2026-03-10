@@ -303,6 +303,33 @@ class TestOrchestrator:
         results = orch.connect_all()
         assert results["MockSpec"] is True
 
+    def test_param_resolution(self):
+        """Tool steps can reference prior step outputs via {step_name}."""
+        orch = Orchestrator()
+
+        results = []
+        orch.registry.register_tool(ToolSpec(
+            name="echo",
+            description="Echo params",
+            handler=lambda **kw: results.append(kw) or kw,
+        ))
+
+        pipeline = Pipeline("resolve_test")
+        pipeline.add_step(PipelineStep(
+            name="first",
+            handler=lambda ctx: "/data/ethanol/1",
+        ))
+        pipeline.add_step(PipelineStep(
+            name="use_ref",
+            tool_name="echo",
+            params={"data_path": "{first}", "static": "hello"},
+        ))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert results[0]["data_path"] == "/data/ethanol/1"
+        assert results[0]["static"] == "hello"
+
     def test_pipeline_result_properties(self):
         orch = Orchestrator()
 

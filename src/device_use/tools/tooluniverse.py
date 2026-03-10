@@ -109,7 +109,7 @@ class ToolUniverseTool(BaseTool):
 
     def find_tools(
         self, query: str, limit: int = 5, method: str = "keyword"
-    ) -> list[dict[str, Any]]:
+    ) -> Any:
         """Find tools matching a query.
 
         Args:
