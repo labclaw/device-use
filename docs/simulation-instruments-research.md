@@ -141,7 +141,7 @@ Plate reader 是最常见的分析仪器之一:
 | **是否需要仪器** | 完全不需要 |
 | **模拟完整度** | 切片 100%, 打印预览 100%, 实际打印需要硬件 |
 | **输出** | G-code + 层级可视化 + 时间/材料预估 |
-| **GUI** | 现代 GUI (Qt-based), 3D 视图 |
+| **GUI** | 现代 GUI (wxWidgets, fork of PrusaSlicer), 3D 视图 |
 | **开源** | ✅ GitHub: bambulab/BambuStudio (AGPL-3.0) |
 | **热模拟** | Helio Additive 集成 → 预测打印失败 |
 
@@ -328,7 +328,7 @@ NMR 是化学/药学的核心分析手段:
 | **模拟完整度** | 数据采集模拟 100% |
 | **输出** | 模拟信号数据 |
 | **GUI** | LabVIEW GUI (独特的图形化编程界面) |
-| **新动态** | 2025: NIGEL AI 助手 (基于 GPT-4o) 即将集成 |
+| **新动态** | NIGEL AI 助手 (基于 GPT-4o) 已集成 |
 
 ---
 
