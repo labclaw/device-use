@@ -243,6 +243,55 @@ def get_architecture():
     }
 
 
+# ── Plate Reader API ──────────────────────────────────────────
+
+@app.get("/api/plate-reader/datasets")
+def plate_reader_datasets():
+    """List plate reader datasets."""
+    orch = _get_orchestrator()
+    reader = orch.registry.get_instrument("PlateReader")
+    if not reader:
+        raise HTTPException(404, "PlateReader not registered")
+    return reader.list_datasets()
+
+
+@app.get("/api/plate-reader/process/{name}")
+def plate_reader_process(name: str):
+    """Process a plate reader dataset and return well data."""
+    orch = _get_orchestrator()
+    reader = orch.registry.get_instrument("PlateReader")
+    if not reader:
+        raise HTTPException(404, "PlateReader not registered")
+
+    t0 = time.time()
+    reading = reader.process(name)
+    dt = time.time() - t0
+
+    # Build heatmap data (8 rows x 12 cols)
+    rows = sorted(set(w.row for w in reading.plate.wells))
+    cols = sorted(set(w.col for w in reading.plate.wells))
+    heatmap = []
+    for r in rows:
+        row_data = []
+        for c in cols:
+            well = reading.plate.get_well(f"{r}{c}")
+            row_data.append(round(well.value, 4) if well else 0)
+        heatmap.append(row_data)
+
+    return {
+        "name": name,
+        "protocol": reading.protocol,
+        "mode": reading.mode.value,
+        "wavelength_nm": reading.wavelength_nm,
+        "wells": len(reading.plate.wells),
+        "rows": rows,
+        "cols": cols,
+        "heatmap": heatmap,
+        "metadata": reading.metadata,
+        "processing_time_s": round(dt, 4),
+    }
+
+
 # ── Frontend ──────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -445,6 +494,28 @@ _INDEX_HTML = """\
   .meta-item { font-size: 0.85rem; }
   .meta-label { color: var(--dim); }
   .meta-value { font-weight: bold; color: var(--green); }
+
+  /* Heatmap */
+  .heatmap { display: inline-block; }
+  .heatmap-row { display: flex; align-items: center; }
+  .heatmap-cell {
+    width: 38px; height: 38px;
+    border: 1px solid var(--bg);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; color: rgba(255,255,255,0.7);
+    cursor: default; transition: transform 0.1s;
+  }
+  .heatmap-cell:hover { transform: scale(1.3); z-index: 1; }
+  .heatmap-label {
+    width: 24px; text-align: center;
+    font-size: 0.75rem; color: var(--dim);
+  }
+  .heatmap-col-labels { display: flex; margin-left: 24px; }
+  .heatmap-col-label {
+    width: 38px; text-align: center;
+    font-size: 0.7rem; color: var(--dim);
+  }
 </style>
 </head>
 <body>
@@ -452,7 +523,7 @@ _INDEX_HTML = """\
   <div class="header">
     <h1>DEVICE-USE</h1>
     <div class="subtitle">ROS for Lab Instruments — AI meets Physical Science</div>
-    <div class="subtitle" style="margin-top: 0.3rem; font-size: 0.75rem; opacity: 0.5;">Cloud Brain ↔ device-use middleware ↔ TopSpin · PubChem · ToolUniverse</div>
+    <div class="subtitle" style="margin-top: 0.3rem; font-size: 0.75rem; opacity: 0.5;">Cloud Brain ↔ device-use middleware ↔ TopSpin · Plate Reader · PubChem · ToolUniverse</div>
   </div>
 
   <div class="status-bar" id="statusBar">
@@ -490,6 +561,21 @@ _INDEX_HTML = """\
 
     <div class="ai-panel" id="aiPanel" style="display:none;"></div>
   </div>
+
+  <!-- Plate Reader Section -->
+  <h3 style="margin: 2rem 0 1rem; color: var(--dim);">Plate Reader</h3>
+  <div class="datasets" id="plateDatasets"></div>
+
+  <div class="result-panel" id="platePanel">
+    <div class="result-header">
+      <div>
+        <h2 id="plateTitle" style="color: var(--magenta);"></h2>
+        <span id="plateSubtitle" style="color: var(--dim); font-size: 0.85rem;"></span>
+      </div>
+    </div>
+    <div class="meta-grid" id="plateMeta"></div>
+    <div id="plateHeatmap" style="margin: 1rem 0;"></div>
+  </div>
 </div>
 
 <script>
@@ -509,7 +595,7 @@ async function init() {
     document.getElementById('statusText').textContent = 'Connection failed';
   }
 
-  // Load datasets
+  // Load NMR datasets
   try {
     const res = await fetch('/api/datasets');
     const datasets = await res.json();
@@ -525,7 +611,26 @@ async function init() {
       container.appendChild(card);
     });
   } catch (e) {
-    console.error('Failed to load datasets:', e);
+    console.error('Failed to load NMR datasets:', e);
+  }
+
+  // Load plate reader datasets
+  try {
+    const res = await fetch('/api/plate-reader/datasets');
+    const datasets = await res.json();
+    const container = document.getElementById('plateDatasets');
+    datasets.forEach(ds => {
+      const card = document.createElement('div');
+      card.className = 'dataset-card';
+      card.innerHTML = `
+        <div class="name">${ds.name}</div>
+        <div class="title">${ds.protocol} · ${ds.mode} · ${ds.wavelength_nm}nm</div>
+      `;
+      card.onclick = () => selectPlate(ds.name);
+      container.appendChild(card);
+    });
+  } catch (e) {
+    console.error('Failed to load plate reader datasets:', e);
   }
 }
 
@@ -676,6 +781,61 @@ async function runPubchem() {
     panel.innerHTML = `<span style="color:var(--dim);">PubChem: ${e.message}</span>`;
   }
   document.getElementById('btnPubchem').disabled = false;
+}
+
+async function selectPlate(name) {
+  // Highlight active card
+  document.querySelectorAll('#plateDatasets .dataset-card').forEach(c => c.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  const panel = document.getElementById('platePanel');
+  panel.classList.add('visible');
+  document.getElementById('plateTitle').textContent = name;
+  document.getElementById('plateMeta').innerHTML = '<span class="loading">Processing...</span>';
+  document.getElementById('plateHeatmap').innerHTML = '';
+
+  try {
+    const res = await fetch(`/api/plate-reader/process/${encodeURIComponent(name)}`);
+    const data = await res.json();
+
+    document.getElementById('plateSubtitle').textContent = `${data.protocol} · ${data.mode}`;
+    document.getElementById('plateMeta').innerHTML = `
+      <div class="meta-item"><div class="meta-label">Mode</div><div class="meta-value">${data.mode}</div></div>
+      <div class="meta-item"><div class="meta-label">Wavelength</div><div class="meta-value">${data.wavelength_nm} nm</div></div>
+      <div class="meta-item"><div class="meta-label">Wells</div><div class="meta-value">${data.wells}</div></div>
+    `;
+
+    // Render heatmap
+    const vals = data.heatmap.flat();
+    const maxVal = Math.max(...vals);
+    const minVal = Math.min(...vals);
+    const range = maxVal - minVal || 1;
+
+    let html = '<div class="heatmap">';
+    // Column labels
+    html += '<div class="heatmap-col-labels">';
+    data.cols.forEach(c => { html += `<div class="heatmap-col-label">${c}</div>`; });
+    html += '</div>';
+    // Data rows
+    data.rows.forEach((r, ri) => {
+      html += '<div class="heatmap-row">';
+      html += `<div class="heatmap-label">${r}</div>`;
+      data.cols.forEach((c, ci) => {
+        const v = data.heatmap[ri][ci];
+        const norm = (v - minVal) / range;
+        const hue = data.mode === 'fluorescence' ? 120 : 200; // green for fluorescence, blue for absorbance
+        const light = 15 + norm * 50;
+        const sat = 60 + norm * 40;
+        html += `<div class="heatmap-cell" style="background:hsl(${hue},${sat}%,${light}%)" title="${r}${c}: ${v}">${v < 1 ? v.toFixed(2) : Math.round(v)}</div>`;
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+
+    document.getElementById('plateHeatmap').innerHTML = html;
+  } catch (e) {
+    document.getElementById('plateMeta').innerHTML = `<span style="color:red;">Failed: ${e.message}</span>`;
+  }
 }
 
 init();
