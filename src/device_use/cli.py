@@ -55,6 +55,11 @@ def main():
         "instruments", help="List registered instruments and tools"
     )
 
+    # status — architecture overview
+    subparsers.add_parser(
+        "status", help="Show architecture status and connections"
+    )
+
     # demo — run a demo pipeline
     demo_parser = subparsers.add_parser(
         "demo", help="Run a demo pipeline (nmr, plate-reader, multi)"
@@ -77,6 +82,8 @@ def main():
         asyncio.run(_interactive(args))
     elif args.command == "instruments":
         _instruments()
+    elif args.command == "status":
+        _status()
     elif args.command == "demo":
         _demo(args.name)
     else:
@@ -190,6 +197,58 @@ def _instruments():
     print(f"\nTools ({len(tools)}):")
     for tool in tools:
         print(f"  {tool.name:<35} {tool.description}")
+
+
+def _status():
+    """Show architecture status with live connection checks."""
+    from device_use.instruments import ControlMode
+    from device_use.instruments.nmr.adapter import TopSpinAdapter
+    from device_use.instruments.plate_reader import PlateReaderAdapter
+    from device_use.orchestrator import Orchestrator
+    from device_use.tools.pubchem import PubChemTool
+    from device_use.tools.tooluniverse import _TU_AVAILABLE
+
+    print("""
+╔══════════════════════════════════════════════════════════════╗
+║              device-use — Architecture Status                ║
+╚══════════════════════════════════════════════════════════════╝
+""")
+
+    # Cloud Brain
+    import os
+    has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    brain_status = "ready" if has_key else "demo mode (no API key)"
+    print(f"  Cloud Brain:     {brain_status}")
+
+    # Orchestrator
+    orch = Orchestrator()
+    nmr = TopSpinAdapter(mode=ControlMode.OFFLINE)
+    reader = PlateReaderAdapter(mode=ControlMode.OFFLINE)
+    orch.register(nmr)
+    orch.register(reader)
+
+    results = orch.connect_all()
+    print(f"  Orchestrator:    {len(orch.registry.list_tools())} tools registered")
+
+    # Instruments
+    print(f"\n  Instruments:")
+    for info in orch.registry.list_instruments():
+        inst = orch.registry.get_instrument(info.name)
+        status = "connected" if inst.connected else "offline"
+        modes = ", ".join(m.value for m in info.supported_modes)
+        print(f"    {info.name:<16} {info.vendor:<10} [{modes}] {status}")
+
+    # External tools
+    print(f"\n  External Tools:")
+    print(f"    PubChem        NCBI PUG REST      active")
+    tu_status = "active" if _TU_AVAILABLE else "install: pip install tooluniverse"
+    print(f"    ToolUniverse   Harvard (600+)     {tu_status}")
+
+    # Stats
+    tools = orch.registry.list_tools()
+    print(f"\n  Total tools: {len(tools)}")
+    print(f"  Control modes: API (gRPC) | GUI (Computer Use) | Offline (local)")
+    print()
 
 
 def _demo(name: str):
