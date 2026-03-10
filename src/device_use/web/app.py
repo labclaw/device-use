@@ -106,10 +106,8 @@ def process_dataset(sample: str, expno: int):
     # Generate plot as base64 PNG
     from device_use.instruments.nmr.visualizer import plot_spectrum
 
-    buf = io.BytesIO()
-    plot_spectrum(spectrum, output_path=buf)
-    buf.seek(0)
-    plot_b64 = base64.b64encode(buf.read()).decode()
+    png_bytes = plot_spectrum(spectrum, output_path=None)
+    plot_b64 = base64.b64encode(png_bytes).decode()
 
     # Peak list
     max_int = max(p.intensity for p in spectrum.peaks) if spectrum.peaks else 1.0
@@ -587,35 +585,6 @@ init();
 </body>
 </html>
 """
-
-
-# Fix matplotlib saving to BytesIO
-import matplotlib
-matplotlib.use("Agg")
-
-_orig_plot = None
-
-
-def _patch_visualizer():
-    """Allow plot_spectrum to accept BytesIO as output_path."""
-    from device_use.instruments.nmr import visualizer
-
-    original = visualizer.plot_spectrum
-
-    def patched(spectrum, output_path="spectrum.png", **kwargs):
-        if isinstance(output_path, io.BytesIO):
-            import matplotlib.pyplot as plt
-
-            result = original(spectrum, output_path="/tmp/_device_use_temp.png", **kwargs)
-            with open("/tmp/_device_use_temp.png", "rb") as f:
-                output_path.write(f.read())
-            return result
-        return original(spectrum, output_path=output_path, **kwargs)
-
-    visualizer.plot_spectrum = patched
-
-
-_patch_visualizer()
 
 
 if __name__ == "__main__":

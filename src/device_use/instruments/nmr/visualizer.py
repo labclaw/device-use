@@ -12,16 +12,21 @@ from device_use.instruments.nmr.processor import NMRSpectrum
 
 def plot_spectrum(
     spectrum: NMRSpectrum,
-    output_path: str | Path = "spectrum.png",
+    output_path: str | Path | None = "spectrum.png",
     title: str | None = None,
     annotate_peaks: bool = True,
     ppm_range: tuple[float, float] | None = None,
-) -> Path:
+) -> Path | bytes:
     """Generate a publication-quality NMR spectrum plot.
 
-    Returns the path to the saved image.
+    Args:
+        output_path: File path to save, or None to return PNG bytes.
+
+    Returns the path to the saved image, or bytes if output_path is None.
     """
-    output_path = Path(output_path)
+    return_bytes = output_path is None
+    if not return_bytes:
+        output_path = Path(output_path)
 
     fig, ax = plt.subplots(1, 1, figsize=(14, 5))
 
@@ -90,9 +95,17 @@ def plot_spectrum(
     )
 
     plt.tight_layout()
-    fig.savefig(str(output_path), dpi=200, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
-    return output_path
+    if return_bytes:
+        import io
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=200, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+        buf.seek(0)
+        return buf.read()
+    else:
+        fig.savefig(str(output_path), dpi=200, bbox_inches="tight", facecolor="white")
+        plt.close(fig)
+        return output_path
 
 
 def _build_title(spectrum: NMRSpectrum) -> str:
