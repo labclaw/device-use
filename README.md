@@ -280,6 +280,41 @@ device-use/
 └── tests/
 ```
 
+## Working Demos (NMR Middleware MVP)
+
+The first instrument integration is **Bruker TopSpin NMR** — a full middleware stack from raw data to AI-driven discovery:
+
+```bash
+# Setup
+python -m venv .venv && source .venv/bin/activate
+pip install nmrglue numpy scipy matplotlib anthropic fastapi uvicorn
+
+# Run demos (no API key needed — cached expert responses included)
+python demos/topspin_identify.py --dataset exam_CMCse_1 --formula C13H20O
+python demos/topspin_dnmr.py              # Temperature-dependent dynamics
+python demos/topspin_batch.py             # 8 compounds + PubChem
+python demos/topspin_blind_challenge.py   # AI identifies unknowns from peaks alone
+python demos/topspin_ai_scientist.py      # Full AI scientist pipeline
+python demos/topspin_pipeline.py          # Orchestrator middleware demo
+./demos/run_web.sh                        # Web GUI at http://localhost:8420
+```
+
+**Architecture** — three control modes, same output:
+```
+Cloud Brain (Claude AI)
+        |
+   Orchestrator (pipeline + registry + events)
+        |
+   TopSpin Adapter
+    |       |       |
+  API    GUI    Offline
+ (gRPC) (CU)  (nmrglue)
+```
+
+**External tools**: PubChem (NCBI) + ToolUniverse (Harvard, 600+ scientific tools)
+
+See [demos/README.md](demos/README.md) for full documentation.
+
 ## Contributing
 
 We need device profiles for every instrument in every lab. If you use a GUI-only instrument, your profile helps every lab with the same device.
