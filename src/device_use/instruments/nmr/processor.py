@@ -71,8 +71,11 @@ class NMRProcessor:
         # Automatic phase correction (suppress scipy optimizer output)
         import io
         import contextlib
+        import warnings
         try:
-            with contextlib.redirect_stdout(io.StringIO()):
+            with contextlib.redirect_stdout(io.StringIO()), \
+                 warnings.catch_warnings():
+                warnings.simplefilter("ignore")
                 spectrum = ng.proc_autophase.autops(spectrum, "acme")
         except Exception:
             pass
@@ -95,7 +98,7 @@ class NMRProcessor:
         base = Path(dataset_path) if dataset_path else Path(dic.get("_datadir", ""))
         title_path = base / "pdata" / "1" / "title"
         if title_path.exists():
-            title = title_path.read_text().strip()
+            title = title_path.read_text().strip().split("\n")[0]
         if base.exists():
             sample_name = base.parent.name
 
