@@ -29,6 +29,9 @@ src/device_use/
       demo_cache.py      # Pre-cached expert responses for demos
       visualizer.py      # Publication-quality spectrum plots
       gui_automation.py  # Computer Use GUI automation
+    plate_reader/
+      adapter.py         # PlateReaderAdapter (absorbance/fluorescence)
+      models.py          # Well, WellPlate, PlateReading data models
   orchestrator.py        # Pipeline + ToolRegistry + Events
   tools/
     base.py              # BaseTool ABC
@@ -38,16 +41,20 @@ src/device_use/
     app.py               # FastAPI web GUI (port 8420)
 
 demos/
-  topspin_identify.py       # Single compound identification
-  topspin_dnmr.py           # Dynamic NMR temperature series
-  topspin_batch.py          # Batch analysis + PubChem
-  topspin_blind_challenge.py # Blind NMR identification quiz
-  topspin_ai_scientist.py   # Full AI scientist pipeline (flagship)
-  run_web.sh                # Web GUI launcher
+  topspin_identify.py         # Single compound identification
+  topspin_dnmr.py             # Dynamic NMR temperature series
+  topspin_batch.py            # Batch analysis + PubChem
+  topspin_blind_challenge.py  # Blind NMR identification quiz
+  topspin_ai_scientist.py     # Full AI scientist pipeline (flagship)
+  topspin_pipeline.py         # Orchestrator middleware demo
+  multi_instrument_demo.py    # NMR + Plate Reader together
+  run_web.sh                  # Web GUI launcher
 
 tests/
-  test_nmr.py            # NMR module tests (25 tests)
-  test_tools.py          # Tool integration tests
+  test_nmr.py              # NMR module tests
+  test_plate_reader.py     # Plate reader tests (18 tests)
+  test_orchestrator.py     # Pipeline + registry tests (22 tests)
+  test_tools.py            # External tool tests
 ```
 
 ## Development Conventions
@@ -55,7 +62,7 @@ tests/
 - **Python 3.11+**, dependencies: nmrglue, numpy, scipy, matplotlib, anthropic, fastapi
 - **TopSpin 5.0.0** examdata at `/opt/topspin5.0.0/examdata/`
 - Run demos with: `PYTHONPATH=src .venv/bin/python demos/<script>.py`
-- Run tests with: `PYTHONPATH=src .venv/bin/python -m pytest tests/test_nmr.py tests/test_tools.py -m "not network"`
+- Run tests with: `python -m pytest tests/ -m "not network"`
 - Web GUI: `./demos/run_web.sh` or `PYTHONPATH=src uvicorn device_use.web.app:app --port 8420`
 
 ## Key Patterns
