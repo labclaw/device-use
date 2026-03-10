@@ -26,6 +26,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Large image originals
+*.HEIC
+*.heic
+
 # Reference repos (submodules)
 Agent-S/
 UFO/
