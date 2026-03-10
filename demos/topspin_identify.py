@@ -202,16 +202,14 @@ def main():
 
     step(4, "Cloud Brain Analysis  (Claude AI)")
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        err("ANTHROPIC_API_KEY not set")
-        info(f"  export ANTHROPIC_API_KEY=sk-ant-...")
-        info(f"  Or run with --no-brain to skip AI analysis")
-        _print_finale(plot_path, brain_used=False)
-        return
-
     from device_use.instruments.nmr.brain import NMRBrain
 
     brain = NMRBrain()
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        info("No API key — using cached demo responses")
+    else:
+        info("Live Claude API mode")
 
     if args.formula:
         info(f"Constraint: molecular formula = {args.formula}")
