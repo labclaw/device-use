@@ -280,35 +280,38 @@ device-use/
 └── tests/
 ```
 
-## Working Demos (NMR Middleware MVP)
+## Working Demos (Multi-Instrument MVP)
 
-The first instrument integration is **Bruker TopSpin NMR** — a full middleware stack from raw data to AI-driven discovery:
+Two instrument types, seven demos, 268 tests — all running without API keys:
 
 ```bash
 # Setup
-python -m venv .venv && source .venv/bin/activate
-pip install nmrglue numpy scipy matplotlib anthropic fastapi uvicorn
+pip install -e ".[nmr,dev]"
 
-# Run demos (no API key needed — cached expert responses included)
+# NMR demos (Bruker TopSpin)
 python demos/topspin_identify.py --dataset exam_CMCse_1 --formula C13H20O
 python demos/topspin_dnmr.py              # Temperature-dependent dynamics
 python demos/topspin_batch.py             # 8 compounds + PubChem
 python demos/topspin_blind_challenge.py   # AI identifies unknowns from peaks alone
 python demos/topspin_ai_scientist.py      # Full AI scientist pipeline
 python demos/topspin_pipeline.py          # Orchestrator middleware demo
-./demos/run_web.sh                        # Web GUI at http://localhost:8420
+
+# Multi-instrument demo (NMR + Plate Reader)
+python demos/multi_instrument_demo.py     # Two instruments, same Orchestrator
+
+# Web GUI
+./demos/run_web.sh                        # http://localhost:8420
 ```
 
-**Architecture** — three control modes, same output:
+**Architecture** — same abstraction, different instruments:
 ```
 Cloud Brain (Claude AI)
         |
    Orchestrator (pipeline + registry + events)
-        |
-   TopSpin Adapter
-    |       |       |
-  API    GUI    Offline
- (gRPC) (CU)  (nmrglue)
+        |                       |
+   TopSpin NMR            Plate Reader
+    |     |    |           |     |    |
+  API   GUI  Offline    API   GUI  Offline
 ```
 
 **External tools**: PubChem (NCBI) + ToolUniverse (Harvard, 600+ scientific tools)
