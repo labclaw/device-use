@@ -33,3 +33,5 @@ Thumbs.db
 # Reference repos (submodules)
 Agent-S/
 UFO/
+output/
+.claude/
