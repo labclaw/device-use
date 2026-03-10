@@ -34,6 +34,7 @@ class TopSpinAdapter(BaseInstrument):
         self.processor = NMRProcessor()
         self._topspin = None
         self._dp = None
+        self._gui = None
         self._connected = False
         self._mode = ControlMode(mode) if isinstance(mode, str) else mode
 
@@ -89,14 +90,19 @@ class TopSpinAdapter(BaseInstrument):
             return False
 
     def _connect_gui(self) -> bool:
-        """Check if TopSpin GUI is visible for Computer Use.
+        """Check if TopSpin GUI is visible for Computer Use."""
+        try:
+            from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
 
-        This is a placeholder — actual implementation will use
-        screen capture to verify TopSpin window is visible.
-        """
-        # TODO: Use Computer Use API to detect TopSpin window
-        self._connected = False
-        return False
+            self._gui = TopSpinGUIAutomation()
+            if not self._gui.available:
+                return False
+            found = self._gui.detect_topspin_window()
+            self._connected = found
+            return found
+        except Exception:
+            self._connected = False
+            return False
 
     def list_datasets(self) -> list[dict[str, Any]]:
         """List available example datasets."""
@@ -183,13 +189,14 @@ class TopSpinAdapter(BaseInstrument):
     def _process_via_gui(self, dataset_path: str) -> NMRSpectrum:
         """Process using Computer Use GUI automation.
 
-        This will visually operate the TopSpin GUI:
-        1. Open the dataset
-        2. Click Process → FT
-        3. Click Process → Phase Correction
-        4. Click Process → Baseline Correction
-        5. Click Analysis → Peak Picking
-        6. Read back result via nmrglue
+        Visually operates the TopSpin GUI:
+        1. Open the dataset via command line
+        2. Run efp (FT + phase)
+        3. Run apbk (auto phase + baseline)
+        4. Run ppf (peak picking)
+        5. Read back result via nmrglue
         """
-        # TODO: Implement using Computer Use API
-        raise NotImplementedError("GUI processing not yet implemented — coming soon")
+        self._gui.open_dataset(dataset_path)
+        self._gui.process_spectrum()
+        # Read back the processed data using nmrglue
+        return self._process_via_nmrglue(dataset_path)
