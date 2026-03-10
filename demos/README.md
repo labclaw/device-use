@@ -15,6 +15,7 @@ python demos/topspin_dnmr.py
 python demos/topspin_batch.py
 python demos/topspin_ai_scientist.py   # full AI scientist pipeline
 python demos/topspin_blind_challenge.py # blind NMR identification quiz
+python demos/topspin_pipeline.py       # orchestrator middleware demo
 
 # 3. Web GUI
 ./demos/run_web.sh    # open http://localhost:8420
@@ -74,6 +75,15 @@ The flagship demo — complete autonomous scientific workflow:
 5. ToolUniverse tool discovery (600+ scientific tools)
 6. Autonomous experiment planning
 
+## Demo 6: Orchestrator Pipeline
+
+```bash
+python demos/topspin_pipeline.py
+python demos/topspin_pipeline.py --dataset exam_CMCse_3 --expno 10
+```
+
+Shows the core middleware pattern: instruments register with the orchestrator, pipelines define multi-step workflows declaratively, events stream to listeners. The demo runs a 4-step pipeline (process → visualize → interpret → PubChem) with real-time event logging.
+
 ## Architecture
 
 ```
@@ -87,7 +97,7 @@ Cloud Brain (Claude / GPT / Gemini)
 
 Three control modes for the same instrument:
 - **API**: gRPC to running TopSpin (port 3081)
-- **GUI**: Computer Use visual automation (coming soon)
+- **GUI**: Computer Use visual automation (Anthropic Computer Use API)
 - **Offline**: nmrglue processing (no TopSpin needed)
 
 External tool integrations:
