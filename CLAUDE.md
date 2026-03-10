@@ -32,7 +32,9 @@ src/device_use/
     plate_reader/
       adapter.py         # PlateReaderAdapter (absorbance/fluorescence)
       models.py          # Well, WellPlate, PlateReading data models
+    template.py          # Copy-and-implement guide for new instruments
   orchestrator.py        # Pipeline + ToolRegistry + Events
+  cli.py                 # CLI: instruments, status, demo, run, interactive
   tools/
     base.py              # BaseTool ABC
     pubchem.py           # PubChem PUG REST integration
@@ -55,15 +57,19 @@ tests/
   test_plate_reader.py     # Plate reader tests (18 tests)
   test_orchestrator.py     # Pipeline + registry tests (22 tests)
   test_tools.py            # External tool tests
+  test_web.py              # Web API endpoint tests (12 tests)
+  test_integration.py      # Cross-instrument pipeline tests (11 tests)
 ```
 
 ## Development Conventions
 
 - **Python 3.11+**, dependencies: nmrglue, numpy, scipy, matplotlib, anthropic, fastapi
 - **TopSpin 5.0.0** examdata at `/opt/topspin5.0.0/examdata/`
-- Run demos with: `PYTHONPATH=src .venv/bin/python demos/<script>.py`
-- Run tests with: `python -m pytest tests/ -m "not network"`
-- Web GUI: `./demos/run_web.sh` or `PYTHONPATH=src uvicorn device_use.web.app:app --port 8420`
+- Install: `pip install -e ".[nmr,dev]"`
+- Run demos: `python demos/<script>.py` or `python -m device_use demo`
+- Run tests: `python -m pytest tests/ -m "not network"` (291 tests)
+- CLI: `python -m device_use status` / `instruments` / `demo`
+- Web GUI: `./demos/run_web.sh` (port 8420)
 
 ## Key Patterns
 
