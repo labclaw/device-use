@@ -127,7 +127,15 @@ The capstone demo — from raw data to paper-ready report, zero manual work:
 
 Output: `output/lab_report.md` + 3 PNG plots
 
-## Demo 9: Real-Time Event Stream
+## Demo 9: Reaction Monitoring
+
+```bash
+python demos/topspin_reaction_monitor.py
+```
+
+Simulates autonomous reaction monitoring — the killer use case for AI-native labs. Processes multiple NMR acquisitions from DNMR temperature series data, tracks peak evolution, detects coalescence trends, and generates a reaction progress dashboard. In production, the AI would acquire spectra at timed intervals and alert when the reaction is complete.
+
+## Demo 10: Real-Time Event Stream
 
 ```bash
 python demos/streaming_demo.py
