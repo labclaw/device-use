@@ -23,6 +23,9 @@ calculate_peak_coverage = _demo.calculate_peak_coverage
 calculate_grounding_score = _demo.calculate_grounding_score
 build_constraints = _demo.build_constraints
 generate_report = _demo.generate_report
+verify_with_pubchem = _demo.verify_with_pubchem
+score_bar = _demo.score_bar
+find_dataset = _demo.find_dataset
 
 # ── Shared test data ────────────────────────────────────────────
 
@@ -219,11 +222,19 @@ class TestBuildConstraints:
 # ── generate_report ─────────────────────────────────────────────
 
 class TestGenerateReport:
-    def _report(self, audit, spectrum, tmp_path):
+    def _report(self, audit, spectrum, tmp_path, threshold=0.7):
         report_path = generate_report(
-            audit, spectrum, str(tmp_path / "spectrum.png"), tmp_path,
+            audit, spectrum, str(tmp_path / "spectrum.png"), tmp_path, threshold,
         )
         return report_path.read_text()
+
+    def test_threshold_respected_in_audit_trail(
+        self, sample_audit_trail, sample_spectrum, tmp_path,
+    ):
+        """Report should use the passed threshold, not hardcoded 0.7."""
+        # Score is 0.85. With threshold=0.9, it should show "No".
+        report = self._report(sample_audit_trail, sample_spectrum, tmp_path, threshold=0.9)
+        assert "No" in report
 
     def test_contains_imrad_sections(self, sample_audit_trail, sample_spectrum, tmp_path):
         lower = self._report(sample_audit_trail, sample_spectrum, tmp_path).lower()
@@ -278,3 +289,117 @@ class TestDataStructures:
         assert sample_audit_trail.accepted is True
         assert sample_audit_trail.final_hypothesis is not None
         assert sample_audit_trail.total_time == 4.2
+
+
+# ── verify_with_pubchem ───────────────────────────────────────
+
+
+class TestVerifyWithPubchem:
+    def test_formula_match_strips_whitespace(self):
+        """Formulas with different whitespace should still match."""
+        from unittest.mock import patch
+        mock_data = {"MolecularFormula": "C 13 H 20 O", "CID": 123}
+        with patch.object(_demo, "PubChemTool") as MockTool:
+            MockTool.return_value.lookup_by_name.return_value = mock_data
+            data, match = verify_with_pubchem("test", "C13H20O")
+            assert match is True
+            assert data["CID"] == 123
+
+    def test_formula_mismatch(self):
+        from unittest.mock import patch
+        mock_data = {"MolecularFormula": "C6H12O6", "CID": 456}
+        with patch.object(_demo, "PubChemTool") as MockTool:
+            MockTool.return_value.lookup_by_name.return_value = mock_data
+            data, match = verify_with_pubchem("glucose", "C13H20O")
+            assert match is False
+
+    def test_pubchem_error_returns_none(self):
+        from unittest.mock import patch
+        from device_use.tools.pubchem import PubChemError
+        with patch.object(_demo, "PubChemTool") as MockTool:
+            MockTool.return_value.lookup_by_name.side_effect = PubChemError("fail")
+            data, match = verify_with_pubchem("nonexistent", "C1H1")
+            assert data is None
+            assert match is False
+
+    def test_empty_formula_handling(self):
+        from unittest.mock import patch
+        mock_data = {"MolecularFormula": "", "CID": 789}
+        with patch.object(_demo, "PubChemTool") as MockTool:
+            MockTool.return_value.lookup_by_name.return_value = mock_data
+            data, match = verify_with_pubchem("test", "C13H20O")
+            assert match is False
+
+
+# ── score_bar ──────────────────────────────────────────────────
+
+
+class TestScoreBar:
+    def test_perfect_score_all_filled(self):
+        bar = score_bar(1.0, width=10)
+        assert "1.00" in bar
+        assert "█" * 10 in bar
+
+    def test_zero_score_all_empty(self):
+        bar = score_bar(0.0, width=10)
+        assert "0.00" in bar
+
+    def test_mid_score_partial_fill(self):
+        bar = score_bar(0.5, width=20)
+        assert "0.50" in bar
+        assert "█" * 10 in bar
+
+    def test_returns_string(self):
+        assert isinstance(score_bar(0.75), str)
+
+
+# ── find_dataset ───────────────────────────────────────────────
+
+
+class TestFindDataset:
+    def test_finds_by_sample_name(self):
+        from unittest.mock import MagicMock
+        adapter = MagicMock()
+        adapter.list_datasets.return_value = [
+            {"sample": "exam_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
+            {"sample": "exam_CMCse_3", "title": "Strychnine", "expno": 10, "path": "/data/3"},
+        ]
+        result = find_dataset(adapter, "CMCse_1", 1)
+        assert result is not None
+        assert result[0] == "/data/1"
+
+    def test_finds_by_title(self):
+        from unittest.mock import MagicMock
+        adapter = MagicMock()
+        adapter.list_datasets.return_value = [
+            {"sample": "exam_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
+        ]
+        result = find_dataset(adapter, "ionone", 1)
+        assert result is not None
+
+    def test_case_insensitive(self):
+        from unittest.mock import MagicMock
+        adapter = MagicMock()
+        adapter.list_datasets.return_value = [
+            {"sample": "EXAM_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
+        ]
+        result = find_dataset(adapter, "exam_cmcse_1", 1)
+        assert result is not None
+
+    def test_returns_none_when_not_found(self):
+        from unittest.mock import MagicMock
+        adapter = MagicMock()
+        adapter.list_datasets.return_value = [
+            {"sample": "exam_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
+        ]
+        result = find_dataset(adapter, "nonexistent", 1)
+        assert result is None
+
+    def test_expno_must_match(self):
+        from unittest.mock import MagicMock
+        adapter = MagicMock()
+        adapter.list_datasets.return_value = [
+            {"sample": "exam_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
+        ]
+        result = find_dataset(adapter, "CMCse_1", 99)
+        assert result is None

@@ -239,6 +239,7 @@ def score_bar(score: float, width: int = 20) -> str:
 def generate_report(
     audit: AuditTrail, spectrum: NMRSpectrum,
     spectrum_image: str, output_path: Path,
+    threshold: float = 0.7,
 ) -> Path:
     """Generate an IMRAD markdown report from the audit trail."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -315,7 +316,7 @@ def generate_report(
         f"| {it.round} | {it.hypothesis.compound_name} "
         f"| {it.grounding_score:.2f} "
         f"| {'Match' if it.formula_match else 'Mismatch'} "
-        f"| {'Yes' if it.grounding_score >= 0.7 else 'No'} |"
+        f"| {'Yes' if it.grounding_score >= threshold else 'No'} |"
         for it in audit.iterations
     )
     sections.append(
@@ -492,7 +493,9 @@ def main() -> None:
         else:
             warn("No library matches found")
         audit.total_time = time.time() - t_start
-        rp = generate_report(audit, spectrum, spectrum_image, output_dir)
+        rp = generate_report(
+            audit, spectrum, spectrum_image, output_dir, args.threshold,
+        )
         ok(f"Report: {BOLD}{rp}{RESET}")
         finale([
             "Library matching only (--no-brain)",
@@ -618,7 +621,7 @@ def main() -> None:
     audit.total_time = time.time() - t_start
     phase(5, "REPORT", "Generate IMRAD report with full audit trail")
     report_path = generate_report(
-        audit, spectrum, spectrum_image, output_dir,
+        audit, spectrum, spectrum_image, output_dir, args.threshold,
     )
     ok(f"Report saved: {BOLD}{report_path}{RESET}")
 
