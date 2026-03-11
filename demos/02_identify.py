@@ -25,79 +25,21 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from lib.terminal import (
+    banner as _lib_banner, step, ok, warn, err, info, progress, done, section,
+    BOLD, DIM, GREEN, CYAN, YELLOW, RED, MAGENTA, RESET,
+    CHECK, ARROW, WARN,
+)
 from device_use.instruments import ControlMode
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.nmr.processor import NMRProcessor
 
 
-# ── Terminal styling ──────────────────────────────────────────────
-
-BOLD = "\033[1m"
-DIM = "\033[2m"
-GREEN = "\033[32m"
-CYAN = "\033[36m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
-MAGENTA = "\033[35m"
-WHITE = "\033[37m"
-RESET = "\033[0m"
-CHECK = f"{GREEN}✓{RESET}"
-ARROW = f"{CYAN}→{RESET}"
-WARN = f"{YELLOW}○{RESET}"
-
-
 def banner():
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║                                                              ║
-║   ██████╗ ███████╗██╗   ██╗██╗ ██████╗███████╗               ║
-║   ██╔══██╗██╔════╝██║   ██║██║██╔════╝██╔════╝               ║
-║   ██║  ██║█████╗  ██║   ██║██║██║     █████╗                 ║
-║   ██║  ██║██╔══╝  ╚██╗ ██╔╝██║██║     ██╔══╝                ║
-║   ██████╔╝███████╗ ╚████╔╝ ██║╚██████╗███████╗              ║
-║   ╚═════╝ ╚══════╝  ╚═══╝  ╚═╝ ╚═════╝╚══════╝  {RESET}{DIM}USE{RESET}{BOLD}{CYAN}       ║
-║                                                              ║
-║   {RESET}{BOLD}TopSpin AI Scientist{RESET}{BOLD}{CYAN}                                       ║
-║   {RESET}{DIM}ROS for Lab Instruments — AI meets Physical Science{RESET}{BOLD}{CYAN}         ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-""")
-
-
-def step(n: int, text: str):
-    print(f"\n{BOLD}{MAGENTA}{'━' * 62}{RESET}")
-    print(f"  {BOLD}Step {n}{RESET} {DIM}│{RESET} {text}")
-    print(f"{BOLD}{MAGENTA}{'━' * 62}{RESET}\n")
-
-
-def ok(text: str):
-    print(f"  {CHECK} {text}")
-
-
-def warn(text: str):
-    print(f"  {WARN} {text}")
-
-
-def info(text: str):
-    print(f"  {DIM}{text}{RESET}")
-
-
-def err(text: str):
-    print(f"  {RED}✗{RESET} {text}")
-
-
-def progress(text: str):
-    print(f"  {ARROW} {text}", end="", flush=True)
-
-
-def done(dt: float):
-    print(f" {GREEN}done{RESET} {DIM}({dt:.1f}s){RESET}")
-
-
-def section(text: str):
-    print(f"\n  {BOLD}{text}{RESET}")
+    _lib_banner("TopSpin AI Scientist", "ROS for Lab Instruments — AI meets Physical Science")
 
 
 # ── Main ──────────────────────────────────────────────────────────
@@ -320,26 +262,18 @@ def _print_peak_table(spectrum):
 
 def _print_finale(plot_path, brain_used: bool):
     """Print the final summary."""
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║  Pipeline Complete                                           ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-
-  {CHECK} Raw FID loaded from TopSpin examdata
-  {CHECK} Processed: FT → Phase → Baseline → Peak Pick
-  {CHECK} Spectrum visualization → {BOLD}{plot_path}{RESET}""")
-
+    from lib.terminal import finale
+    results = [
+        "Raw FID loaded from TopSpin examdata",
+        "Processed: FT → Phase → Baseline → Peak Pick",
+        f"Spectrum visualization → {BOLD}{plot_path}{RESET}",
+    ]
     if brain_used:
-        print(f"  {CHECK} Cloud Brain identified compound structure")
-        print(f"  {CHECK} Cloud Brain recommended next experiment")
+        results.append("Cloud Brain identified compound structure")
+        results.append("Cloud Brain recommended next experiment")
     else:
-        print(f"  {DIM}○ Cloud Brain skipped{RESET}")
-
-    print(f"""
-  {BOLD}device-use{RESET} — middleware for scientific instruments
-  {DIM}Like ROS for robots, but for NMR, microscopes, and more.{RESET}
-  {DIM}Any AI agent. Any control mode. Any instrument.{RESET}
-""")
+        results.append(f"{DIM}Cloud Brain skipped{RESET}")
+    finale(results)
 
 
 if __name__ == "__main__":

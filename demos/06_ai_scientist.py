@@ -35,50 +35,23 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning, module="nmrglue")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy")
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from lib.terminal import (
+    banner as _lib_banner, phase,
+    BOLD, DIM, GREEN, CYAN, YELLOW, RED, MAGENTA, BLUE, RESET,
+    CHECK, ARROW, STAR,
+)
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.nmr.visualizer import plot_spectrum
 from device_use.tools.pubchem import PubChemTool, PubChemError
 from device_use.tools.tooluniverse import ToolUniverseTool, _TU_AVAILABLE
 
 
-# ── Terminal styling ──────────────────────────────────────────────
-
-BOLD = "\033[1m"
-DIM = "\033[2m"
-GREEN = "\033[32m"
-CYAN = "\033[36m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
-MAGENTA = "\033[35m"
-BLUE = "\033[34m"
-RESET = "\033[0m"
-CHECK = f"{GREEN}✓{RESET}"
-ARROW = f"{CYAN}→{RESET}"
-STAR = f"{YELLOW}★{RESET}"
-
-
 def banner():
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║                                                              ║
-║   {RESET}{BOLD}AI Scientist Pipeline{RESET}{BOLD}{CYAN}                                      ║
-║   {RESET}{DIM}NMR → Process → Identify → Cross-Reference → Plan{RESET}{BOLD}{CYAN}          ║
-║                                                              ║
-║   {RESET}{DIM}device-use | ToolUniverse | PubChem | Claude AI{RESET}{BOLD}{CYAN}              ║
-║   {RESET}{DIM}The complete autonomous discovery workflow{RESET}{BOLD}{CYAN}                   ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-""")
-
-
-def phase(n: int, title: str, subtitle: str = ""):
-    print(f"\n{BOLD}{MAGENTA}{'━' * 62}{RESET}")
-    print(f"  {BOLD}Phase {n}{RESET} {DIM}│{RESET} {BOLD}{title}{RESET}")
-    if subtitle:
-        print(f"         {DIM}{subtitle}{RESET}")
-    print(f"{BOLD}{MAGENTA}{'━' * 62}{RESET}\n")
+    _lib_banner("AI Scientist Pipeline",
+                "NMR → Process → Identify → Cross-Reference → Plan")
 
 
 # ── Known compounds for demo ─────────────────────────────────────
@@ -300,25 +273,15 @@ def main():
 
     total_peaks = sum(len(e["spectrum"].peaks) for e in spectra.values())
 
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║  AI Scientist Pipeline Complete                              ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-
-  {CHECK} {BOLD}{len(spectra)} compounds{RESET} processed ({total_peaks} total peaks)
-  {CHECK} NMR spectra acquired via {BOLD}device-use{RESET} middleware
-  {CHECK} Compounds identified by {BOLD}Claude AI{RESET} Cloud Brain
-  {CHECK} Cross-referenced against {BOLD}PubChem{RESET} (NCBI)
-  {CHECK} ToolUniverse: {BOLD}{'connected (600+ tools)' if _TU_AVAILABLE else 'architecture ready'}{RESET}
-  {CHECK} Next experiments planned autonomously
-
-  {BOLD}What this demonstrates:{RESET}
-  {DIM}• AI can autonomously run the full scientific method{RESET}
-  {DIM}• device-use provides ROS-like middleware for instruments{RESET}
-  {DIM}• Loose coupling: any AI brain + any instrument + any tool{RESET}
-  {DIM}• ToolUniverse adds 600+ scientific tools to the pipeline{RESET}
-  {DIM}• From raw FID to discovery — end to end, no human in the loop{RESET}
-""")
+    from lib.terminal import finale
+    finale([
+        f"{BOLD}{len(spectra)} compounds{RESET} processed ({total_peaks} total peaks)",
+        f"NMR spectra acquired via {BOLD}device-use{RESET} middleware",
+        f"Compounds identified by {BOLD}Claude AI{RESET} Cloud Brain",
+        f"Cross-referenced against {BOLD}PubChem{RESET} (NCBI)",
+        f"ToolUniverse: {BOLD}{'connected (600+ tools)' if _TU_AVAILABLE else 'architecture ready'}{RESET}",
+        "Next experiments planned autonomously",
+    ], title="AI Scientist Pipeline Complete")
 
 
 if __name__ == "__main__":

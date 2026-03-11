@@ -20,6 +20,7 @@ import statistics
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from device_use.instruments import ControlMode
@@ -33,13 +34,9 @@ from device_use.orchestrator import (
 
 
 def main():
-    print("""
-╔══════════════════════════════════════════════════════════════╗
-║        device-use: Multi-Instrument Orchestration           ║
-║                                                             ║
-║  One middleware → Two instrument types → Same interface     ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import banner
+    banner("Multi-Instrument Orchestration",
+           "One middleware → Two instrument types → Same interface")
 
     # ── Phase 1: Create orchestrator and register instruments ─────────
     print("═══ Phase 1: Instrument Registration ═══\n")
@@ -177,18 +174,13 @@ def main():
     print(f"  Total steps run: {len(nmr_result.steps) + len(reader_result.steps)}")
     print(f"  All succeeded: {nmr_result.success and reader_result.success}")
 
-    print("""
-╔══════════════════════════════════════════════════════════════╗
-║                                                             ║
-║  Same BaseInstrument abstraction, same Orchestrator,        ║
-║  same Pipeline engine — just different instrument types.    ║
-║                                                             ║
-║  This is what makes device-use "ROS for Lab Instruments."   ║
-║                                                             ║
-║  Next: Add YOUR instrument by implementing BaseInstrument.  ║
-║                                                             ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import finale
+    finale([
+        "Same BaseInstrument abstraction, same Orchestrator, same Pipeline engine",
+        "Just different instrument types",
+        "This is what makes device-use 'ROS for Lab Instruments'",
+        "Next: Add YOUR instrument by implementing BaseInstrument",
+    ])
 
 
 def _process_nmr_sample(nmr, ctx):

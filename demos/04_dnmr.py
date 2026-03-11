@@ -26,51 +26,22 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning, module="nmrglue")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy")
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from lib.terminal import (
+    banner as _lib_banner, step, ok, info, simulate_stream,
+    BOLD, DIM, GREEN, CYAN, YELLOW, RED, MAGENTA, RESET,
+    CHECK, ARROW,
+)
 from device_use.instruments import ControlMode
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.nmr.processor import NMRProcessor
 
-# ── Terminal styling ──────────────────────────────────────────────
-
-BOLD = "\033[1m"
-DIM = "\033[2m"
-GREEN = "\033[32m"
-CYAN = "\033[36m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
-MAGENTA = "\033[35m"
-RESET = "\033[0m"
-CHECK = f"{GREEN}✓{RESET}"
-ARROW = f"{CYAN}→{RESET}"
-
 
 def banner():
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║                                                              ║
-║   {RESET}{BOLD}Dynamic NMR — Temperature Series Analysis{RESET}{BOLD}{CYAN}                 ║
-║   {RESET}{DIM}AI watches molecular dynamics change in real time{RESET}{BOLD}{CYAN}            ║
-║                                                              ║
-║   {RESET}{DIM}device-use | ROS for Lab Instruments{RESET}{BOLD}{CYAN}                        ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-""")
-
-
-def step(n: int, text: str):
-    print(f"\n{BOLD}{MAGENTA}{'━' * 62}{RESET}")
-    print(f"  {BOLD}Step {n}{RESET} {DIM}│{RESET} {text}")
-    print(f"{BOLD}{MAGENTA}{'━' * 62}{RESET}\n")
-
-
-def ok(text: str):
-    print(f"  {CHECK} {text}")
-
-
-def info(text: str):
-    print(f"  {DIM}{text}{RESET}")
+    _lib_banner("Dynamic NMR — Temperature Series Analysis",
+                "AI watches molecular dynamics change in real time")
 
 
 # ── Main ──────────────────────────────────────────────────────────
@@ -183,7 +154,7 @@ def main():
         if cached:
             print(f"  {DIM}(using cached analysis){RESET}\n")
             print(f"  {CYAN}{'─' * 56}{RESET}")
-            for chunk in _simulate_stream(cached):
+            for chunk in simulate_stream(cached):
                 sys.stdout.write(chunk)
                 sys.stdout.flush()
             print(f"\n  {CYAN}{'─' * 56}{RESET}")
@@ -285,32 +256,19 @@ def _plot_overlay(spectra, temps, output_path):
     plt.close(fig)
 
 
-def _simulate_stream(text, chunk_size=30, delay=0.02):
-    """Simulate streaming output for cached responses."""
-    import time as t
-    for i in range(0, len(text), chunk_size):
-        t.sleep(delay)
-        yield text[i:i + chunk_size]
-
-
 def _print_finale(plot_path, brain_used: bool):
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║  Dynamic NMR Analysis Complete                               ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-
-  {CHECK} Processed multi-temperature NMR series
-  {CHECK} Generated temperature overlay visualization
-  {CHECK} Saved to {BOLD}{plot_path}{RESET}""")
-
+    from lib.terminal import finale
+    results = [
+        "Processed multi-temperature NMR series",
+        "Generated temperature overlay visualization",
+        f"Saved to {BOLD}{plot_path}{RESET}",
+    ]
     if brain_used:
-        print(f"  {CHECK} AI analyzed conformational dynamics")
-
-    print(f"""
-  {BOLD}Why this matters:{RESET}
-  {DIM}Traditional DNMR analysis takes hours of manual peak fitting.{RESET}
-  {DIM}Device-Use does it in seconds — from raw data to insight.{RESET}
-""")
+        results.append("AI analyzed conformational dynamics")
+    finale(results, title="Dynamic NMR Analysis Complete")
+    print(f"  {BOLD}Why this matters:{RESET}")
+    print(f"  {DIM}Traditional DNMR analysis takes hours of manual peak fitting.{RESET}")
+    print(f"  {DIM}Device-Use does it in seconds — from raw data to insight.{RESET}\n")
 
 
 if __name__ == "__main__":

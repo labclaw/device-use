@@ -17,8 +17,10 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from lib.terminal import RESET
 from device_use.instruments import ControlMode
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.plate_reader import PlateReaderAdapter
@@ -52,7 +54,6 @@ COLORS = {
     EventType.INSTRUMENT_REGISTERED: "\033[0;34m",  # blue
     EventType.INSTRUMENT_CONNECTED: "\033[0;34m",
 }
-RESET = "\033[0m"
 
 
 def format_event(event: Event, t0: float) -> str:
@@ -79,13 +80,9 @@ def format_event(event: Event, t0: float) -> str:
 
 
 def main():
-    print("""
-╔══════════════════════════════════════════════════════════════╗
-║  device-use: Real-Time Event Stream                          ║
-║                                                              ║
-║  Watch events flow as instruments process data in real-time  ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import banner
+    banner("Real-Time Event Stream",
+           "Watch events flow as instruments process data in real-time")
 
     t0 = time.time()
     events: list[Event] = []
@@ -241,13 +238,11 @@ def main():
         print(f"    ELISA S/N: {qc['elisa_snr']}x {'PASS' if qc['elisa_pass'] else 'FAIL'}")
         print(f"    Viability Z: {qc['viability_z_factor']} {'PASS' if qc['viability_pass'] else 'FAIL'}")
 
-    print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║  Every event is capturable — feed to dashboards, audit      ║
-║  logs, alerting systems, or AI agents. This is what makes   ║
-║  device-use middleware, not just a script.                    ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import finale
+    finale([
+        "Every event is capturable — feed to dashboards, audit logs, or AI agents",
+        "This is what makes device-use middleware, not just a script",
+    ])
 
 
 if __name__ == "__main__":

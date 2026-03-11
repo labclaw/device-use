@@ -9,20 +9,23 @@ Usage:
     python demos/topspin_library.py
 """
 
+import sys
 import warnings
+from pathlib import Path
+
 warnings.filterwarnings("ignore")
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from lib.terminal import banner
 from device_use import create_orchestrator
 from device_use.instruments.nmr.library import SpectralLibrary
 from device_use.orchestrator import Pipeline, PipelineStep
 
 
 def main():
-    print("""
-╔══════════════════════════════════════════════════════════════╗
-║           NMR Spectral Library — Fingerprint Matching        ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    banner("NMR Spectral Library", "Fingerprint Matching — build and query reference database")
 
     # 1. Build library from all available data
     print("  Building spectral library from TopSpin examdata...")

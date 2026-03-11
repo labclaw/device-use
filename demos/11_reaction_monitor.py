@@ -21,6 +21,7 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from device_use import create_orchestrator
@@ -28,13 +29,9 @@ from device_use.orchestrator import Pipeline, PipelineStep
 
 
 def main():
-    print("""
-╔══════════════════════════════════════════════════════════════╗
-║  Autonomous Reaction Monitor                                 ║
-║                                                              ║
-║  AI tracks spectral changes and detects reaction completion  ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import banner
+    banner("Autonomous Reaction Monitor",
+           "AI tracks spectral changes and detects reaction completion")
 
     t0 = time.time()
 
@@ -239,19 +236,12 @@ def main():
     print(f"  Saved: {out2}")
 
     dt = time.time() - t0
-    print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║  Monitoring Complete ({dt:.1f}s)                                  ║
-║                                                              ║
-║  In a real autonomous lab, the AI would:                     ║
-║    1. Acquire spectra at timed intervals                     ║
-║    2. Detect when reaction reaches completion                ║
-║    3. Alert the scientist or proceed to workup               ║
-║    4. Log everything for reproducibility                     ║
-║                                                              ║
-║  device-use makes this possible with any NMR instrument.     ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import finale
+    finale([
+        f"Monitoring complete ({dt:.1f}s)",
+        "In a real autonomous lab: acquire at intervals, detect completion, alert, log",
+        "device-use makes this possible with any NMR instrument",
+    ], title="Monitoring Complete")
 
 
 if __name__ == "__main__":

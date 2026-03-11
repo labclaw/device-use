@@ -26,8 +26,14 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning, module="nmrglue")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy")
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from lib.terminal import (
+    banner as _lib_banner,
+    BOLD, DIM, GREEN, CYAN, YELLOW, RED, MAGENTA, BLUE, RESET,
+    CHECK, ARROW,
+)
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.orchestrator import (
     Event,
@@ -38,21 +44,6 @@ from device_use.orchestrator import (
     StepStatus,
     ToolSpec,
 )
-
-
-# ── Terminal styling ──────────────────────────────────────────────
-
-BOLD = "\033[1m"
-DIM = "\033[2m"
-GREEN = "\033[32m"
-CYAN = "\033[36m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
-MAGENTA = "\033[35m"
-BLUE = "\033[34m"
-RESET = "\033[0m"
-CHECK = f"{GREEN}✓{RESET}"
-ARROW = f"{CYAN}→{RESET}"
 
 # Event icons
 EVENT_ICONS = {
@@ -93,16 +84,8 @@ def event_logger(event: Event):
 
 
 def banner():
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║                                                              ║
-║   {RESET}{BOLD}Orchestrator Pipeline Demo{RESET}{BOLD}{CYAN}                                 ║
-║   {RESET}{DIM}Middleware in action — events, tools, pipelines{RESET}{BOLD}{CYAN}              ║
-║                                                              ║
-║   {RESET}{DIM}device-use | ROS for Lab Instruments{RESET}{BOLD}{CYAN}                        ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-""")
+    _lib_banner("Orchestrator Pipeline Demo",
+                "Middleware in action — events, tools, pipelines")
 
 
 def main():
@@ -242,21 +225,14 @@ def main():
         print(f"    CID: {pubchem_data.get('CID', '?')}")
         print(f"    Formula: {pubchem_data.get('MolecularFormula', '?')}")
 
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║  Pipeline Complete                                           ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-
-  Total time: {BOLD}{result.duration_ms:.0f}ms{RESET}
-  Success: {BOLD}{GREEN if result.success else RED}{result.success}{RESET}
-
-  {BOLD}What this demonstrates:{RESET}
-  {DIM}• Orchestrator routes tool calls to registered instruments{RESET}
-  {DIM}• Pipelines define declarative multi-step workflows{RESET}
-  {DIM}• Events stream to listeners for monitoring and UI{RESET}
-  {DIM}• Conditional steps skip when preconditions aren't met{RESET}
-  {DIM}• This is the middleware pattern — instruments are interchangeable{RESET}
-""")
+    from lib.terminal import finale
+    finale([
+        f"Total time: {BOLD}{result.duration_ms:.0f}ms{RESET}",
+        f"Success: {BOLD}{GREEN if result.success else RED}{result.success}{RESET}",
+        "Orchestrator routes tool calls to registered instruments",
+        "Pipelines define declarative multi-step workflows",
+        "Events stream to listeners for monitoring and UI",
+    ])
 
 
 # ── Pipeline step handlers ────────────────────────────────────────

@@ -22,37 +22,21 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning, module="nmrglue")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy")
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from lib.terminal import (
+    banner as _lib_banner,
+    BOLD, DIM, GREEN, CYAN, YELLOW, RED, MAGENTA, RESET,
+    CHECK, ARROW,
+)
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.nmr.processor import NMRProcessor, NMRSpectrum
 
-# ── Terminal styling ──────────────────────────────────────────────
-
-BOLD = "\033[1m"
-DIM = "\033[2m"
-GREEN = "\033[32m"
-CYAN = "\033[36m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
-MAGENTA = "\033[35m"
-RESET = "\033[0m"
-CHECK = f"{GREEN}✓{RESET}"
-ARROW = f"{CYAN}→{RESET}"
-
 
 def banner():
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║                                                              ║
-║   {RESET}{BOLD}Blind NMR Challenge{RESET}{BOLD}{CYAN}                                        ║
-║   {RESET}{DIM}Can AI identify compounds from peaks alone?{RESET}{BOLD}{CYAN}                 ║
-║                                                              ║
-║   {RESET}{DIM}No names. No formulas. Just chemical shifts.{RESET}{BOLD}{CYAN}                ║
-║   {RESET}{DIM}device-use | ROS for Lab Instruments{RESET}{BOLD}{CYAN}                        ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-""")
+    _lib_banner("Blind NMR Challenge",
+                "Can AI identify compounds from peaks alone?")
 
 
 # Known answers for scoring
@@ -192,18 +176,13 @@ def main():
     total = len(challenges)
     pct = score / total * 100 if total > 0 else 0
 
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║  Challenge Complete                                          ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-
-  Score: {BOLD}{score}/{total}{RESET} ({pct:.0f}%)
-
-  {BOLD}What this demonstrates:{RESET}
-  {DIM}AI can identify compounds from NMR peak lists alone —{RESET}
-  {DIM}no images, no special training, just chemical shift reasoning.{RESET}
-  {DIM}This is what Device-Use enables: AI + instruments = discovery.{RESET}
-""")
+    from lib.terminal import finale
+    finale([
+        f"Score: {BOLD}{score}/{total}{RESET} ({pct:.0f}%)",
+        "AI can identify compounds from NMR peak lists alone",
+        "No images, no special training, just chemical shift reasoning",
+        "This is what Device-Use enables: AI + instruments = discovery",
+    ], title="Challenge Complete")
 
 
 if __name__ == "__main__":

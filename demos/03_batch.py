@@ -22,36 +22,21 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning, module="nmrglue")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy")
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from lib.terminal import (
+    banner as _lib_banner,
+    BOLD, DIM, GREEN, CYAN, YELLOW, RED, MAGENTA, RESET,
+    CHECK, ARROW,
+)
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.nmr.processor import NMRProcessor
 
-# ── Terminal styling ──────────────────────────────────────────────
-
-BOLD = "\033[1m"
-DIM = "\033[2m"
-GREEN = "\033[32m"
-CYAN = "\033[36m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
-MAGENTA = "\033[35m"
-RESET = "\033[0m"
-CHECK = f"{GREEN}✓{RESET}"
-ARROW = f"{CYAN}→{RESET}"
-
 
 def banner():
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║                                                              ║
-║   {RESET}{BOLD}Batch NMR Analysis — Multi-Compound Pipeline{RESET}{BOLD}{CYAN}               ║
-║   {RESET}{DIM}Process → Identify → PubChem Verify — Fully Automated{RESET}{BOLD}{CYAN}       ║
-║                                                              ║
-║   {RESET}{DIM}device-use | ROS for Lab Instruments{RESET}{BOLD}{CYAN}                        ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-""")
+    _lib_banner("Batch NMR Analysis — Multi-Compound Pipeline",
+                "Process → Identify → PubChem Verify — Fully Automated")
 
 
 def main():
@@ -174,19 +159,13 @@ def main():
     print(f"  {'─' * 58}")
 
     # ── Finale ──
-    print(f"""
-{BOLD}{CYAN}╔══════════════════════════════════════════════════════════════╗
-║  Batch Analysis Complete                                     ║
-╚══════════════════════════════════════════════════════════════╝{RESET}
-
-  {CHECK} Processed {BOLD}{len(success)}{RESET} compounds
-  {CHECK} Generated {BOLD}{len(success)}{RESET} spectrum plots
-  {CHECK} Cross-referenced with PubChem
-  {CHECK} All outputs saved to {BOLD}{output_dir}/{RESET}
-
-  {BOLD}device-use{RESET} — from raw data to verified compound identity.
-  {DIM}No manual intervention. No copy-paste. Fully automated.{RESET}
-""")
+    from lib.terminal import finale
+    finale([
+        f"Processed {BOLD}{len(success)}{RESET} compounds",
+        f"Generated {BOLD}{len(success)}{RESET} spectrum plots",
+        "Cross-referenced with PubChem",
+        f"All outputs saved to {BOLD}{output_dir}/{RESET}",
+    ], title="Batch Analysis Complete")
 
 
 def _extract_compound_name(title: str) -> str:

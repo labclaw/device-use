@@ -14,11 +14,16 @@ Usage:
 
 import logging
 import statistics
+import sys
 import time
 import warnings
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 logging.disable(logging.CRITICAL)
+
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from device_use import create_orchestrator
 from device_use.orchestrator import Pipeline, PipelineStep

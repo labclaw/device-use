@@ -18,8 +18,10 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from lib.terminal import banner
 from device_use.instruments import ControlMode
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.orchestrator import Orchestrator, Pipeline, PipelineStep
@@ -31,13 +33,7 @@ def main():
     parser.add_argument("--sample2", default="exam_CMCse_3", help="Second sample name")
     args = parser.parse_args()
 
-    print("""
-╔══════════════════════════════════════════════════════════════╗
-║  NMR Compound Comparison                                     ║
-║                                                              ║
-║  Side-by-side spectral analysis with AI interpretation       ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    banner("NMR Compound Comparison", "Side-by-side spectral analysis with AI interpretation")
 
     t0 = time.time()
 
@@ -207,14 +203,12 @@ def main():
             print(f"    {label}: {name} → not found")
 
     dt = time.time() - t0
-    print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║  Comparison Complete ({dt:.1f}s)                                  ║
-║                                                              ║
-║  From raw FIDs to differential analysis — automated.         ║
-║  Next: add more compounds and build a spectral library.      ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import finale
+    finale([
+        f"Comparison complete ({dt:.1f}s)",
+        "From raw FIDs to differential analysis — automated",
+        "Next: add more compounds and build a spectral library",
+    ], title="Comparison Complete")
 
 
 if __name__ == "__main__":

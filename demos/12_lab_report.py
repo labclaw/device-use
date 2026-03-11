@@ -20,6 +20,7 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from device_use.instruments import ControlMode
@@ -33,13 +34,9 @@ def main():
     parser.add_argument("--output", "-o", default="output/lab_report.md")
     args = parser.parse_args()
 
-    print("""
-╔══════════════════════════════════════════════════════════════╗
-║          AI Lab Report Generator                             ║
-║                                                              ║
-║  Raw data → Process → Analyze → Cross-reference → Report     ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import banner
+    banner("AI Lab Report Generator",
+           "Raw data → Process → Analyze → Cross-reference → Report")
 
     t0 = time.time()
 
@@ -281,17 +278,14 @@ Cloud Brain (Claude AI)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(report)
 
-    print(f"\n  Report saved: {output_path}")
-    print(f"  Total time: {dt:.1f}s")
-    print(f"  Sections: NMR analysis + ELISA + Cell Viability + Methods")
-    print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║  Lab Report Complete                                         ║
-║                                                              ║
-║  From raw instrument data to paper-ready report.             ║
-║  Zero manual work. This is the AI-native lab.                ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    from lib.terminal import finale
+    finale([
+        f"Report saved: {output_path}",
+        f"Total time: {dt:.1f}s",
+        "Sections: NMR analysis + ELISA + Cell Viability + Methods",
+        "From raw instrument data to paper-ready report",
+        "Zero manual work. This is the AI-native lab.",
+    ], title="Lab Report Complete")
 
 
 if __name__ == "__main__":
