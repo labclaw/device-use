@@ -187,6 +187,23 @@ print(result.actions)    # every click, keystroke, verification
 print(result.duration)   # how long it took
 ```
 
+### MCP Server (Claude Code Integration)
+
+Connect Claude Code directly to lab instruments:
+
+```json
+{
+  "mcpServers": {
+    "device-use": {
+      "command": "python",
+      "args": ["-m", "device_use.integrations.mcp_server"]
+    }
+  }
+}
+```
+
+Then in Claude Code: *"List NMR datasets"*, *"Process the ethanol sample"*, *"Run plate reader ELISA assay"* — Claude calls the instrument tools directly.
+
 ### With LabClaw
 
 ```python
@@ -279,6 +296,54 @@ device-use/
 │   └── ...
 └── tests/
 ```
+
+## Working Demos (Multi-Instrument MVP)
+
+Two instrument types, 15 demos, 355 tests — all running without API keys:
+
+```bash
+# Setup
+pip install -e ".[nmr,dev]"
+
+# Start here
+python demos/quickstart.py                # 30-second intro, no setup needed
+
+# NMR demos (Bruker TopSpin)
+python demos/topspin_identify.py --dataset exam_CMCse_1 --formula C13H20O
+python demos/topspin_dnmr.py              # Temperature-dependent dynamics
+python demos/topspin_batch.py             # 8 compounds + PubChem
+python demos/topspin_blind_challenge.py   # AI identifies unknowns from peaks alone
+python demos/topspin_ai_scientist.py      # Full AI scientist pipeline
+python demos/topspin_pipeline.py          # Orchestrator middleware demo
+python demos/topspin_library.py          # Spectral library fingerprint matching
+
+# Multi-instrument demos
+python demos/multi_instrument_demo.py     # Two instruments, same Orchestrator
+python demos/lab_report_demo.py           # Raw data → paper-ready report
+python demos/streaming_demo.py            # Real-time event stream
+python demos/topspin_compare.py           # Side-by-side spectral comparison
+python demos/topspin_reaction_monitor.py  # Autonomous reaction monitoring
+python demos/benchmark.py                # Performance benchmark
+python demos/showcase.py                 # All features in one script (pitch demo)
+
+# Web GUI
+./demos/run_web.sh                        # http://localhost:8420
+```
+
+**Architecture** — same abstraction, different instruments:
+```
+Cloud Brain (Claude AI)
+        |
+   Orchestrator (pipeline + registry + events)
+        |                       |
+   TopSpin NMR            Plate Reader
+    |     |    |           |     |    |
+  API   GUI  Offline    API   GUI  Offline
+```
+
+**External tools**: PubChem (NCBI) + ToolUniverse (Harvard, 600+ scientific tools)
+
+See [demos/README.md](demos/README.md) for full documentation.
 
 ## Contributing
 

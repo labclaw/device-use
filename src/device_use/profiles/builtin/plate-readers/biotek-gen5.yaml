@@ -1,0 +1,98 @@
+name: biotek-gen5
+version: "1.0"
+description: "BioTek Gen5 — microplate reader control software"
+software: Gen5
+hardware_connected: true
+safety_level: strict
+
+screen:
+  width: 1920
+  height: 1080
+  scale_factor: 1.0
+
+window_title_pattern: ".*Gen5.*"
+
+allowed_actions:
+  - click
+  - double_click
+  - type
+  - hotkey
+  - scroll
+  - wait
+  - screenshot
+
+ui_elements:
+  - name: protocol_tree
+    description: "Left panel showing protocol structure (Plate, Read, etc.)"
+    element_type: tree_view
+
+  - name: read_button
+    description: "Green Read/Start button to initiate plate reading"
+    element_type: button
+    region: null
+
+  - name: plate_layout
+    description: "Plate layout grid showing well assignments"
+    element_type: grid
+
+  - name: results_table
+    description: "Results data table after reading"
+    element_type: table
+
+  - name: toolbar
+    description: "Main toolbar with New, Open, Save, Read buttons"
+    element_type: toolbar
+
+workflows:
+  - name: start_read
+    description: "Start a plate reading with current protocol"
+    steps:
+      - action: click
+        target: read_button
+        parameters:
+          text: "Read"
+        description: "Click the Read button"
+        requires_confirmation: true
+      - action: wait
+        parameters:
+          seconds: 5
+        description: "Wait for plate reader to initialize"
+        verify: "Check that reading progress bar appears"
+
+  - name: export_results
+    description: "Export results to Excel file"
+    steps:
+      - action: click
+        target: menu_bar
+        parameters:
+          text: "File"
+        description: "Click File menu"
+      - action: click
+        target: menu_item
+        parameters:
+          text: "Export..."
+        description: "Click Export"
+      - action: wait
+        parameters:
+          seconds: 1
+        description: "Wait for export dialog"
+
+safety:
+  max_actions_per_minute: 10
+  forbidden_regions: []
+  requires_confirmation:
+    - start_read
+    - change_protocol
+    - delete_data
+  emergency_stop_file: "/tmp/device_use_stop"
+  bounds:
+    temperature_min: 4
+    temperature_max: 45
+    shake_speed_max: 1000
+    read_timeout_max: 3600
+
+metadata:
+  category: plate-readers
+  manufacturer: BioTek (Agilent)
+  instrument_type: microplate_reader
+  connection: USB/Serial

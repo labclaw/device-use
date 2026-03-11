@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "device-use"
+version = "0.1.0"
+description = "Like browser-use, but for scientific instruments — GUI agent framework for lab software"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "pillow>=10.0",
+    "pyautogui>=0.9",
+    "pyperclip>=1.8",
+    "mss>=9.0",
+    "anthropic>=0.40",
+    "openai>=1.0",
+    "backoff>=2.0",
+]
+
+[project.optional-dependencies]
+nmr = [
+    "nmrglue>=0.9",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+]
+web = [
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+]
+tools = [
+    "tooluniverse>=1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+]
+
+[project.scripts]
+device-use = "device_use.cli:main"
+
+[project.entry-points."labclaw.plugins"]
+device_use = "device_use.integrations.labclaw:create_plugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/device_use"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "network: tests that require network access (deselect with -m 'not network')",
+]
+
+[tool.coverage.run]
+source = ["device_use"]
+omit = ["*/tests/*", "*/demos/*"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+check_untyped_defs = true
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"

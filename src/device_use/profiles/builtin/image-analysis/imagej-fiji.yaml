@@ -1,0 +1,102 @@
+name: imagej-fiji
+version: "1.0"
+description: "ImageJ/FIJI — open-source image analysis platform"
+software: FIJI
+hardware_connected: false
+safety_level: normal
+
+screen:
+  width: 1920
+  height: 1080
+  scale_factor: 1.0
+
+window_title_pattern: ".*ImageJ.*|.*Fiji.*"
+
+allowed_actions:
+  - click
+  - double_click
+  - right_click
+  - type
+  - hotkey
+  - scroll
+  - drag
+  - wait
+  - screenshot
+
+ui_elements:
+  - name: menu_bar
+    description: "Main menu bar (File, Edit, Image, Process, Analyze, Plugins, Window, Help)"
+    element_type: menu_bar
+
+  - name: toolbar
+    description: "Tool selection bar below menu"
+    element_type: toolbar
+
+  - name: status_bar
+    description: "Bottom status bar showing pixel info and memory"
+    element_type: status_bar
+
+workflows:
+  - name: open_image
+    description: "Open an image file via File > Open"
+    steps:
+      - action: click
+        target: menu_bar
+        parameters:
+          text: "File"
+        description: "Click File menu"
+      - action: click
+        target: menu_item
+        parameters:
+          text: "Open..."
+        description: "Click Open menu item"
+      - action: wait
+        parameters:
+          seconds: 1
+        description: "Wait for file dialog"
+
+  - name: adjust_brightness_contrast
+    description: "Open Brightness/Contrast adjustment"
+    steps:
+      - action: click
+        target: menu_bar
+        parameters:
+          text: "Image"
+        description: "Click Image menu"
+      - action: click
+        target: menu_item
+        parameters:
+          text: "Adjust"
+        description: "Click Adjust submenu"
+      - action: click
+        target: menu_item
+        parameters:
+          text: "Brightness/Contrast..."
+        description: "Click Brightness/Contrast"
+
+  - name: measure_selection
+    description: "Measure the current selection"
+    steps:
+      - action: hotkey
+        parameters:
+          keys: ["ctrl", "m"]
+        description: "Ctrl+M to measure"
+
+safety:
+  max_actions_per_minute: 60
+  forbidden_regions: []
+  requires_confirmation: []
+  emergency_stop_file: "/tmp/device_use_stop"
+  bounds: {}
+
+metadata:
+  category: image-analysis
+  homepage: https://fiji.sc
+  file_formats:
+    - tif
+    - tiff
+    - png
+    - jpg
+    - nd2
+    - czi
+    - lif
