@@ -282,7 +282,7 @@ device-use/
 
 ## Working Demos (Multi-Instrument MVP)
 
-Two instrument types, 10 demos, 296 tests — all running without API keys:
+Two instrument types, 11 demos, 302 tests — all running without API keys:
 
 ```bash
 # Setup
@@ -303,6 +303,7 @@ python demos/topspin_pipeline.py          # Orchestrator middleware demo
 python demos/multi_instrument_demo.py     # Two instruments, same Orchestrator
 python demos/lab_report_demo.py           # Raw data → paper-ready report
 python demos/streaming_demo.py            # Real-time event stream
+python demos/topspin_compare.py           # Side-by-side spectral comparison
 
 # Web GUI
 ./demos/run_web.sh                        # http://localhost:8420

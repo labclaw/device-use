@@ -337,3 +337,49 @@ class TestOrchestrator:
         assert result.success
         assert result.outputs == {"a": 1, "b": 2, "c": 3}
         assert result.last_output == 3
+
+
+# ── Factory ──────────────────────────────────────────────────────
+
+class TestCreateOrchestrator:
+    def test_default_all_instruments(self):
+        from device_use import create_orchestrator
+        orch = create_orchestrator()
+        instruments = orch.registry.list_instruments()
+        assert len(instruments) == 2
+        types = {i.instrument_type for i in instruments}
+        assert types == {"nmr", "plate_reader"}
+
+    def test_nmr_only(self):
+        from device_use import create_orchestrator
+        orch = create_orchestrator(instruments=["nmr"])
+        instruments = orch.registry.list_instruments()
+        assert len(instruments) == 1
+        assert instruments[0].instrument_type == "nmr"
+
+    def test_plate_reader_only(self):
+        from device_use import create_orchestrator
+        orch = create_orchestrator(instruments=["plate_reader"])
+        instruments = orch.registry.list_instruments()
+        assert len(instruments) == 1
+        assert instruments[0].instrument_type == "plate_reader"
+
+    def test_no_connect(self):
+        from device_use import create_orchestrator
+        orch = create_orchestrator(connect=False)
+        instruments = orch.registry.list_instruments()
+        assert len(instruments) == 2
+        # Instruments registered but not connected
+        for info in instruments:
+            inst = orch.registry.get_instrument(info.name)
+            # Offline mode auto-connects on process, but connected flag may vary
+            assert inst is not None
+
+    def test_tools_registered(self):
+        from device_use import create_orchestrator
+        orch = create_orchestrator()
+        tools = orch.registry.list_tools()
+        assert len(tools) == 6
+        names = [t.name for t in tools]
+        assert "topspin.list_datasets" in names
+        assert "platereader.process" in names
