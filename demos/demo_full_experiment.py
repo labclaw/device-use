@@ -70,6 +70,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", default="Cyclosporine",
                         help="Dataset name or keyword (default: Cyclosporine)")
     parser.add_argument("--expno", type=int, default=1, help="Experiment number")
+    parser.add_argument("--compound", default="",
+                        help="Compound name for PubChem lookup (auto-detected from dataset title if omitted)")
     parser.add_argument("--formula", default="C62H111N11O12",
                         help="Molecular formula (default: Cyclosporine A)")
     parser.add_argument("--no-gui", action="store_true", help="Skip GUI phase")
@@ -131,7 +133,8 @@ def phase_research(args: argparse.Namespace) -> dict:
     pubchem = PubChemTool()
     try:
         t0 = time.time()
-        result = pubchem.lookup_by_name(args.dataset.replace("_", " "))
+        compound_name = args.compound or args.dataset.replace("_", " ")
+        result = pubchem.lookup_by_name(compound_name)
         dt = time.time() - t0
         results["pubchem"] = result
         print(f"  {CHECK} Found compound {DIM}({dt:.1f}s){RESET}")
