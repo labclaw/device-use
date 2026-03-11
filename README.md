@@ -282,11 +282,14 @@ device-use/
 
 ## Working Demos (Multi-Instrument MVP)
 
-Two instrument types, seven demos, 268 tests — all running without API keys:
+Two instrument types, 10 demos, 296 tests — all running without API keys:
 
 ```bash
 # Setup
 pip install -e ".[nmr,dev]"
+
+# Start here
+python demos/quickstart.py                # 30-second intro, no setup needed
 
 # NMR demos (Bruker TopSpin)
 python demos/topspin_identify.py --dataset exam_CMCse_1 --formula C13H20O
@@ -296,8 +299,10 @@ python demos/topspin_blind_challenge.py   # AI identifies unknowns from peaks al
 python demos/topspin_ai_scientist.py      # Full AI scientist pipeline
 python demos/topspin_pipeline.py          # Orchestrator middleware demo
 
-# Multi-instrument demo (NMR + Plate Reader)
+# Multi-instrument demos
 python demos/multi_instrument_demo.py     # Two instruments, same Orchestrator
+python demos/lab_report_demo.py           # Raw data → paper-ready report
+python demos/streaming_demo.py            # Real-time event stream
 
 # Web GUI
 ./demos/run_web.sh                        # http://localhost:8420
