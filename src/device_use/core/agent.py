@@ -274,3 +274,28 @@ class DeviceAgent:
     def max_cu_turns(self) -> int:
         """Maximum computer use turns for CU-mode execution."""
         return self._max_cu_turns
+
+    async def run_cu_loop(
+        self,
+        task: str,
+        take_screenshot: Any,
+        execute_action: Any,
+    ) -> list[dict[str, Any]]:
+        """Run a full computer use loop, forwarding max_cu_turns to the backend.
+
+        Delegates to ``backend.run_cu_loop`` with ``max_turns=self._max_cu_turns``.
+
+        Args:
+            task: The task description for the CU agent.
+            take_screenshot: Async callable returning screenshot bytes.
+            execute_action: Async callable taking a mapped action dict.
+
+        Returns:
+            List of all actions executed during the loop.
+        """
+        return await self._backend.run_cu_loop(
+            task,
+            take_screenshot,
+            execute_action,
+            max_turns=self._max_cu_turns,
+        )

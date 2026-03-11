@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import AsyncMock
+
 import pytest
 
 from device_use.core.agent import DeviceAgent
@@ -332,6 +335,86 @@ class TestDeviceAgent:
         agent._executor._settle_delay = 0
         result = await agent.execute("Do task")
         assert result.success is True  # Eventually completes after skipping bad action
+
+
+class TestMaxCUTurnsForwarded:
+    """Verify that max_cu_turns is forwarded from DeviceAgent to run_cu_loop."""
+
+    def test_max_cu_turns_forwarded(self):
+        """DeviceAgent(max_cu_turns=3) passes max_turns=3 to backend.run_cu_loop."""
+        profile = DeviceProfile(name="test", software="App")
+        backend = MockBackend()
+        backend.run_cu_loop = AsyncMock(return_value=[])
+
+        agent = DeviceAgent(profile, backend, max_cu_turns=3)
+        asyncio.run(agent.run_cu_loop(
+            task="test task",
+            take_screenshot=AsyncMock(return_value=b"png"),
+            execute_action=AsyncMock(),
+        ))
+
+        backend.run_cu_loop.assert_called_once()
+        call_kwargs = backend.run_cu_loop.call_args
+        assert call_kwargs.kwargs["max_turns"] == 3
+
+    def test_max_cu_turns_default(self):
+        """Default max_cu_turns=24 is forwarded correctly."""
+        profile = DeviceProfile(name="test", software="App")
+        backend = MockBackend()
+        backend.run_cu_loop = AsyncMock(return_value=[])
+
+        agent = DeviceAgent(profile, backend)
+        assert agent.max_cu_turns == 24
+
+        asyncio.run(agent.run_cu_loop(
+            task="test",
+            take_screenshot=AsyncMock(return_value=b"png"),
+            execute_action=AsyncMock(),
+        ))
+
+        assert backend.run_cu_loop.call_args.kwargs["max_turns"] == 24
+
+    def test_max_cu_turns_caps_loop(self):
+        """Integration: run_cu_loop with real backend respects max_turns cap."""
+        from device_use.backends.openai_compat import OpenAICompatBackend
+
+        cu_backend = OpenAICompatBackend(model="gpt-5.4", api_key="sk-test")
+        profile = DeviceProfile(name="test", software="App")
+        agent = DeviceAgent(profile, cu_backend, max_cu_turns=3)
+
+        from types import SimpleNamespace
+        turn_count = 0
+
+        async def mock_responses(**kwargs):
+            nonlocal turn_count
+            turn_count += 1
+            action = SimpleNamespace(
+                type="click", x=10, y=20, button="left",
+            )
+            call = SimpleNamespace(
+                type="computer_call",
+                call_id=f"call_{turn_count}",
+                actions=[action],
+                action=action,
+                pending_safety_checks=[],
+            )
+            return SimpleNamespace(
+                id=f"resp_{turn_count}",
+                output=[call],
+                output_text="",
+            )
+
+        cu_backend._responses_create = mock_responses
+
+        actions = asyncio.run(agent.run_cu_loop(
+            task="infinite task",
+            take_screenshot=AsyncMock(return_value=b"png"),
+            execute_action=AsyncMock(),
+        ))
+
+        # Should have executed exactly 3 turns (one action each)
+        assert turn_count == 3
+        assert len(actions) == 3
 
 
 # Helper — uses _create_minimal_png from conftest
