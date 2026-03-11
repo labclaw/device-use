@@ -9,16 +9,21 @@ source .venv/bin/activate
 pip install nmrglue numpy scipy matplotlib anthropic fastapi uvicorn
 pip install tooluniverse  # optional: Harvard's 600+ scientific tools
 
-# 2. Run any demo
+# 2. Start here
+python demos/quickstart.py              # 30-second intro — no setup needed
+
+# 3. Explore demos
 python demos/topspin_identify.py --dataset exam_CMCse_1 --formula C13H20O
 python demos/topspin_dnmr.py
 python demos/topspin_batch.py
-python demos/topspin_ai_scientist.py   # full AI scientist pipeline
+python demos/topspin_ai_scientist.py    # full AI scientist pipeline
 python demos/topspin_blind_challenge.py # blind NMR identification quiz
-python demos/topspin_pipeline.py       # orchestrator middleware demo
-python demos/multi_instrument_demo.py  # NMR + plate reader together
+python demos/topspin_pipeline.py        # orchestrator middleware demo
+python demos/multi_instrument_demo.py   # NMR + plate reader together
+python demos/lab_report_demo.py         # raw data → paper-ready report
+python demos/streaming_demo.py          # real-time event-driven processing
 
-# 3. Web GUI
+# 4. Web GUI
 ./demos/run_web.sh    # open http://localhost:8420
 ```
 
@@ -27,6 +32,14 @@ python demos/multi_instrument_demo.py  # NMR + plate reader together
 - **TopSpin 5.0.0** installed at `/opt/topspin5.0.0/` (for examdata)
 - **Python 3.11+** with the packages listed above
 - **ANTHROPIC_API_KEY** (optional — demos use cached responses without it)
+
+## Demo 0: Quickstart
+
+```bash
+python demos/quickstart.py
+```
+
+The simplest possible demo — no API key, no TopSpin, no setup. Shows the core pattern: create orchestrator → register instruments → connect → process data → done. Run this first.
 
 ## Demo 1: Identify Unknown Compound
 
@@ -96,6 +109,31 @@ The "ROS for Lab Instruments" demo — orchestrates TWO different instrument typ
 2. Plate Reader (Gen5) — ELISA / cell viability assays
 
 Both instruments register with the same Orchestrator, share the same Pipeline engine. Shows Z-factor calculation, signal/noise ratios, and cross-instrument summaries.
+
+## Demo 8: AI Lab Report Generator
+
+```bash
+python demos/lab_report_demo.py
+python demos/lab_report_demo.py --output my_report.md
+```
+
+The capstone demo — from raw data to paper-ready report, zero manual work:
+1. Process data from BOTH instruments (NMR + Plate Reader)
+2. AI analyzes NMR spectrum (compound identification, peak assignment)
+3. Cross-reference on PubChem (CID, molecular formula, SMILES)
+4. Generate publication-quality plots (spectrum + heatmaps)
+5. Compute assay statistics (signal/noise, Z-factor)
+6. Write structured lab report combining all findings
+
+Output: `output/lab_report.md` + 3 PNG plots
+
+## Demo 9: Real-Time Event Stream
+
+```bash
+python demos/streaming_demo.py
+```
+
+Shows the key differentiator of device-use as middleware: events stream in real-time with colored timestamps as instruments process data. Runs two parallel pipelines (NMR multi-sample + plate reader QC) and displays a complete event audit trail with timing, counts, and pass/fail metrics.
 
 ## Architecture
 
