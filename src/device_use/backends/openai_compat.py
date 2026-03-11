@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
@@ -97,6 +98,8 @@ class OpenAICompatBackend:
                 tools=[{"type": "computer"}],
                 previous_response_id=self._previous_response_id,
                 input=input_items,
+                reasoning={"effort": "low"},
+                truncation="auto",
             )
         else:
             # Initial call: EasyInputMessageParam with text + image
@@ -117,12 +120,24 @@ class OpenAICompatBackend:
                 "model": self._model,
                 "tools": [{"type": "computer"}],
                 "input": input_items,
+                "reasoning": {"effort": "low"},
+                "truncation": "auto",
             }
             if self.system_prompt:
                 kwargs["instructions"] = self.system_prompt
             response = await self._responses_create(**kwargs)
 
         self._previous_response_id = response.id
+
+        # Check for pending safety checks — don't silently ignore
+        for item in getattr(response, "output", []):
+            if getattr(item, "type", None) == "pending_safety_checks":
+                logger.warning(
+                    "CU response contains pending_safety_checks: %s", item
+                )
+                response._has_safety_checks = True
+                break
+
         return response
 
     def _extract_computer_calls(
@@ -175,6 +190,64 @@ class OpenAICompatBackend:
     def reset_session(self) -> None:
         """Reset the Responses API session (clear previous_response_id)."""
         self._previous_response_id = None
+
+    async def run_cu_loop(
+        self,
+        task: str,
+        take_screenshot: Any,
+        execute_action: Any,
+        *,
+        max_turns: int = 24,
+    ) -> list[dict[str, Any]]:
+        """Run a full computer use loop with safety and turn limits.
+
+        Args:
+            task: The task description for the CU agent.
+            take_screenshot: Async callable returning screenshot bytes.
+            execute_action: Async callable taking a mapped action dict.
+            max_turns: Maximum loop iterations before breaking (default 24).
+
+        Returns:
+            List of all actions executed during the loop.
+        """
+        self.reset_session()
+        all_actions: list[dict[str, Any]] = []
+        call_id: str | None = None
+
+        for turn in range(max_turns):
+            screenshot = await take_screenshot()
+            response = await self._computer_use_step(screenshot, task, call_id)
+
+            # Handle pending safety checks — abort loop
+            if getattr(response, "_has_safety_checks", False):
+                logger.warning(
+                    "CU loop aborting at turn %d due to pending_safety_checks", turn
+                )
+                break
+
+            cu_actions = self._extract_computer_calls(response)
+            if not cu_actions:
+                # No more computer_call items — model considers task done
+                logger.info("CU loop completed at turn %d (no actions)", turn)
+                break
+
+            # Execute each action with inter-action delay
+            for i, cu in enumerate(cu_actions):
+                mapped = self._map_cu_action(cu)
+                await execute_action(mapped)
+                all_actions.append(mapped)
+
+                # 120ms delay between actions (skip for wait/screenshot)
+                action_type = cu.get("action_type", "")
+                if action_type not in ("wait", "screenshot") and i < len(cu_actions) - 1:
+                    await asyncio.sleep(0.12)
+
+            # Use last call_id for continuation
+            call_id = cu_actions[-1].get("call_id")
+        else:
+            logger.warning("CU loop hit max_turns cap (%d)", max_turns)
+
+        return all_actions
 
     # ------------------------------------------------------------------
     # VisionBackend protocol methods
