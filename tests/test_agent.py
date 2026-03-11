@@ -9,10 +9,9 @@ import pytest
 
 from device_use.core.agent import DeviceAgent
 from device_use.core.history import AgentHistory, HistoryEntry
-from device_use.core.models import ActionResult, ActionRequest, ActionType, DeviceProfile
+from device_use.core.models import ActionRequest, ActionResult, ActionType, DeviceProfile
 from device_use.core.prompts import PromptBuilder
 from device_use.core.result import AgentResult
-
 
 # --- Mock VisionBackend ---
 
@@ -282,7 +281,7 @@ class TestDeviceAgent:
         # Backend never says done
         backend = MockBackend(plan_responses=[
             {
-                "reasoning": f"Step action",
+                "reasoning": "Step action",
                 "action": {"action_type": "wait", "seconds": 0.01},
                 "done": False,
             }
@@ -360,8 +359,6 @@ class TestBatchedActionStopsOnFailure:
         agent._executor._settle_delay = 0
 
         # Make executor return failure for the primary click action
-        from unittest.mock import MagicMock
-        original_execute = agent._executor.execute
         call_count = 0
 
         def failing_execute(action):
@@ -372,8 +369,9 @@ class TestBatchedActionStopsOnFailure:
 
         agent._executor.execute = failing_execute
 
-        result = await agent.execute("Click and type")
+        agent_result = await agent.execute("Click and type")
         # Only 1 action should have been attempted (the primary click)
+        assert agent_result is not None
         assert call_count == 1
 
     @pytest.mark.asyncio
@@ -408,8 +406,9 @@ class TestBatchedActionStopsOnFailure:
 
         agent._executor.execute = second_fails
 
-        result = await agent.execute("Multi-action task")
+        agent_result = await agent.execute("Multi-action task")
         # Primary succeeds (1), first batched fails (2), third is skipped
+        assert agent_result is not None
         assert call_count == 2
 
 
@@ -497,7 +496,8 @@ class TestMaxCUTurnsForwarded:
 
 async def _mock_capture() -> bytes:
     """Return a minimal valid PNG for testing."""
-    import struct, zlib
+    import struct
+    import zlib
     def _create_minimal_png():
         sig = b'\x89PNG\r\n\x1a\n'
         ihdr_data = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
@@ -506,7 +506,11 @@ async def _mock_capture() -> bytes:
         raw = b'\x00\xff\x00\x00'
         compressed = zlib.compress(raw)
         idat_crc = zlib.crc32(b'IDAT' + compressed) & 0xffffffff
-        idat = struct.pack('>I', len(compressed)) + b'IDAT' + compressed + struct.pack('>I', idat_crc)
+        idat = (
+            struct.pack('>I', len(compressed))
+            + b'IDAT' + compressed
+            + struct.pack('>I', idat_crc)
+        )
         iend_crc = zlib.crc32(b'IEND') & 0xffffffff
         iend = struct.pack('>I', 0) + b'IEND' + struct.pack('>I', iend_crc)
         return sig + ihdr + idat + iend
