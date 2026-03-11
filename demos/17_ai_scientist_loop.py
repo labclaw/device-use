@@ -607,7 +607,7 @@ def main() -> None:
         grounding = calculate_grounding_score(
             formula_match, peak_coverage, lib_score,
         )
-        if hypothesis.compound_name.strip().lower() == "unknown":
+        if not hypothesis.compound_name or hypothesis.compound_name.strip().lower() == "unknown":
             grounding = 0.0
             warn("Unknown compound — grounding score forced to 0")
 
