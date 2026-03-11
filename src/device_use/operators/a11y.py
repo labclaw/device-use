@@ -170,11 +170,22 @@ class AccessibilityOperator(BaseOperator):
             children = []
             for i in range(count):
                 child = self._cf.CFArrayGetValueAtIndex(ch, i)
-                self._cf.CFRetain(child)
-                children.append(child)
+                if child:
+                    self._cf.CFRetain(child)
+                    children.append(child)
             return children
         finally:
             self._cf.CFRelease(ch)
+
+    @contextmanager
+    def _iter_children(self, el: c_void_p):
+        """Yield children with proper retain/release lifecycle."""
+        children = self._get_children(el)
+        try:
+            yield children
+        finally:
+            for child in children:
+                self._cf.CFRelease(child)
 
     # ------------------------------------------------------------------
     # Public API: Read state
@@ -199,12 +210,13 @@ class AccessibilityOperator(BaseOperator):
         if not win:
             return []
         texts = []
-        for child in self._get_children(win):
-            role = self._get_str(child, "AXRole")
-            if role == "AXStaticText":
-                val = self._get_str(child, "AXValue")
-                if val:
-                    texts.append(val)
+        with self._iter_children(win) as children:
+            for child in children:
+                role = self._get_str(child, "AXRole")
+                if role == "AXStaticText":
+                    val = self._get_str(child, "AXValue")
+                    if val:
+                        texts.append(val)
         return texts
 
     def get_command_input(self) -> str | None:
@@ -212,10 +224,11 @@ class AccessibilityOperator(BaseOperator):
         win = self.get_focused_window()
         if not win:
             return None
-        for child in self._get_children(win):
-            role = self._get_str(child, "AXRole")
-            if role == "AXTextField":
-                return self._get_str(child, "AXValue")
+        with self._iter_children(win) as children:
+            for child in children:
+                role = self._get_str(child, "AXRole")
+                if role == "AXTextField":
+                    return self._get_str(child, "AXValue")
         return None
 
     def read_state_sync(self) -> dict[str, Any]:
@@ -238,17 +251,20 @@ class AccessibilityOperator(BaseOperator):
         if err != 0 or not menubar:
             return {}
         result = {}
-        for menu in self._get_children(menubar):
-            title = self._get_str(menu, "AXTitle")
-            if not title or title == "Apple":
-                continue
-            items = []
-            for sub in self._get_children(menu):
-                for item in self._get_children(sub):
-                    t = self._get_str(item, "AXTitle")
-                    if t:
-                        items.append(t)
-            result[title] = items
+        with self._iter_children(menubar) as menus:
+            for menu in menus:
+                title = self._get_str(menu, "AXTitle")
+                if not title or title == "Apple":
+                    continue
+                items = []
+                with self._iter_children(menu) as subs:
+                    for sub in subs:
+                        with self._iter_children(sub) as sub_items:
+                            for item in sub_items:
+                                t = self._get_str(item, "AXTitle")
+                                if t:
+                                    items.append(t)
+                result[title] = items
         return result
 
     def click_menu(self, *path: str) -> bool:
@@ -259,30 +275,41 @@ class AccessibilityOperator(BaseOperator):
         if err != 0 or not menubar:
             return False
 
-        current_children = self._get_children(menubar)
-        for i, name in enumerate(path):
-            match = self._find_menu_match(current_children, name)
-            if match is None:
-                return False
-            if i == len(path) - 1:
-                # Last item — click it
-                with self._temp_cfstr("AXPress") as cf_press:
-                    err = self._ax.AXUIElementPerformAction(match, cf_press)
-                return err == 0
-            else:
-                # Intermediate menu — descend
-                current_children = self._get_children(match)
-                # Flatten: menus have one submenu child containing items
-                if current_children:
-                    expanded = []
-                    for c in current_children:
-                        r = self._get_str(c, "AXRole")
-                        if r in ("AXMenu", "AXList"):
-                            expanded.extend(self._get_children(c))
-                        else:
-                            expanded.append(c)
-                    current_children = expanded
-        return False
+        # Track all children lists for cleanup
+        owned: list[list[c_void_p]] = []
+        try:
+            current_children = self._get_children(menubar)
+            owned.append(current_children)
+            for i, name in enumerate(path):
+                match = self._find_menu_match(current_children, name)
+                if match is None:
+                    return False
+                if i == len(path) - 1:
+                    # Last item — click it
+                    with self._temp_cfstr("AXPress") as cf_press:
+                        err = self._ax.AXUIElementPerformAction(match, cf_press)
+                    return err == 0
+                else:
+                    # Intermediate menu — descend
+                    current_children = self._get_children(match)
+                    owned.append(current_children)
+                    # Flatten: menus have one submenu child containing items
+                    if current_children:
+                        expanded = []
+                        for c in current_children:
+                            r = self._get_str(c, "AXRole")
+                            if r in ("AXMenu", "AXList"):
+                                sub_children = self._get_children(c)
+                                owned.append(sub_children)
+                                expanded.extend(sub_children)
+                            else:
+                                expanded.append(c)
+                        current_children = expanded
+            return False
+        finally:
+            for children_list in owned:
+                for child in children_list:
+                    self._cf.CFRelease(child)
 
     def _find_menu_match(
         self, children: list[c_void_p], name: str
@@ -309,17 +336,22 @@ class AccessibilityOperator(BaseOperator):
         if not win:
             return []
         buttons = []
-        for child in self._get_children(win):
-            role = self._get_str(child, "AXRole")
-            if role == "AXScrollArea":
-                for sub in self._get_children(child):
-                    if self._get_str(sub, "AXRole") == "AXToolbar":
-                        for btn in self._get_children(sub):
-                            t = self._get_str(btn, "AXTitle") or self._get_str(
-                                btn, "AXDescription"
-                            )
-                            if t:
-                                buttons.append(t)
+        with self._iter_children(win) as children:
+            for child in children:
+                role = self._get_str(child, "AXRole")
+                if role == "AXScrollArea":
+                    with self._iter_children(child) as subs:
+                        for sub in subs:
+                            if self._get_str(sub, "AXRole") == "AXToolbar":
+                                with self._iter_children(sub) as btns:
+                                    for btn in btns:
+                                        t = self._get_str(
+                                            btn, "AXTitle"
+                                        ) or self._get_str(
+                                            btn, "AXDescription"
+                                        )
+                                        if t:
+                                            buttons.append(t)
         return buttons
 
     # ------------------------------------------------------------------
