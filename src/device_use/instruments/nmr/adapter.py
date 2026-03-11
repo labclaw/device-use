@@ -191,12 +191,20 @@ class TopSpinAdapter(BaseInstrument):
         # Read back processed data via nmrglue for consistent output format
         return self._process_via_nmrglue(dataset_path)
 
-    def _process_via_gui(self, dataset_path: str) -> NMRSpectrum:
-        """Process using GUI automation with verification screenshots."""
+    def _process_via_gui(
+        self,
+        dataset_path: str,
+        on_screenshot: Any | None = None,
+    ) -> NMRSpectrum:
+        """Process using GUI automation.
+
+        Args:
+            on_screenshot: Optional callback for verification screenshots.
+                If None, no screenshots are captured (saves memory).
+        """
         self._gui.open_dataset(dataset_path)
-        self._gui_screenshots = []
         self._gui.process_spectrum(
-            verify=True,
-            on_screenshot=self._gui_screenshots.append,
+            verify=on_screenshot is not None,
+            on_screenshot=on_screenshot,
         )
         return self._process_via_nmrglue(dataset_path)
