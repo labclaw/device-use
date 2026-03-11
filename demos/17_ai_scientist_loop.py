@@ -21,6 +21,7 @@ import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,13 @@ from lib.terminal import (  # noqa: E402
 # ── Data Structures ──────────────────────────────────────────────
 
 
+ConfidenceLevel = Literal["High", "Medium", "Low", "Unknown"]
+
+
 @dataclass
 class Hypothesis:
     compound_name: str
-    confidence: str  # "High", "Medium", "Low"
+    confidence: ConfidenceLevel
     raw_analysis: str
     peak_assignments: list[str]
 
@@ -71,10 +75,18 @@ class AuditTrail:
     question: str
     dataset: str
     formula: str
+    threshold: float = 0.7
     iterations: list[Iteration] = field(default_factory=list)
     accepted: bool = False
     final_hypothesis: Hypothesis | None = None
     total_time: float = 0.0
+
+    def accept(self, hypothesis: Hypothesis) -> None:
+        self.accepted = True
+        self.final_hypothesis = hypothesis
+
+    def reject(self, hypothesis: Hypothesis) -> None:
+        self.final_hypothesis = hypothesis
 
 
 # ── Hypothesis Parsing ───────────────────────────────────────────
@@ -249,7 +261,6 @@ def score_bar(score: float, width: int = 20) -> str:
 def generate_report(
     audit: AuditTrail, spectrum: NMRSpectrum,
     spectrum_image: str, output_path: Path,
-    threshold: float = 0.7,
 ) -> Path:
     """Generate an IMRAD markdown report from the audit trail."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -328,7 +339,7 @@ def generate_report(
         f"| {it.round} | {it.hypothesis.compound_name} "
         f"| {it.grounding_score:.2f} "
         f"| {'Match' if it.formula_match else 'Mismatch'} "
-        f"| {'Yes' if it.grounding_score >= threshold else 'No'} |"
+        f"| {'Yes' if it.grounding_score >= audit.threshold else 'No'} |"
         for it in audit.iterations
     )
     sections.append(
@@ -423,6 +434,7 @@ def main() -> None:
 
     audit = AuditTrail(
         question=args.question, dataset=args.dataset, formula=args.formula,
+        threshold=args.threshold,
     )
 
     # ── Phase 1: OBSERVE ──
@@ -505,16 +517,16 @@ def main() -> None:
                 formula_match=fm, pubchem_data=pc_data,
                 library_score=best.score, constraints=[],
             ))
-            audit.accepted = gs >= args.threshold
-            audit.final_hypothesis = hyp
+            if gs >= args.threshold:
+                audit.accept(hyp)
+            else:
+                audit.reject(hyp)
             ok(f"Best match: {BOLD}{best.entry.name}{RESET}")
             print(f"    Grounding: {score_bar(gs)}")
         else:
             warn("No library matches found")
         audit.total_time = time.time() - t_start
-        rp = generate_report(
-            audit, spectrum, spectrum_image, output_dir, args.threshold,
-        )
+        rp = generate_report(audit, spectrum, spectrum_image, output_dir)
         ok(f"Report: {BOLD}{rp}{RESET}")
         finale([
             "Library matching only (--no-brain)",
@@ -634,19 +646,18 @@ def main() -> None:
                f"threshold {args.threshold:.2f}")
             ok(f"{GREEN}ACCEPTED{RESET}: "
                f"{BOLD}{hypothesis.compound_name}{RESET}")
-            audit.accepted = True
-            audit.final_hypothesis = hypothesis
+            audit.accept(hypothesis)
             break
 
         warn(f"Score {BOLD}{grounding:.2f}{RESET} < "
              f"threshold {args.threshold:.2f}")
         if iteration_num >= args.max_iterations:
             warn(f"Max iterations ({args.max_iterations}) reached")
-            audit.final_hypothesis = hypothesis
+            audit.reject(hypothesis)
             break
         if not has_api:
             warn("Cached mode -- cannot refine without ANTHROPIC_API_KEY")
-            audit.final_hypothesis = hypothesis
+            audit.reject(hypothesis)
             break
         constraints = [build_constraints(iteration, spectrum)]
         info("Refining with new constraints...")
@@ -654,9 +665,7 @@ def main() -> None:
     # ── Phase 5: REPORT ──
     audit.total_time = time.time() - t_start
     phase(5, "REPORT", "Generate IMRAD report with full audit trail")
-    report_path = generate_report(
-        audit, spectrum, spectrum_image, output_dir, args.threshold,
-    )
+    report_path = generate_report(audit, spectrum, spectrum_image, output_dir)
     ok(f"Report saved: {BOLD}{report_path}{RESET}")
 
     section("Audit Trail Summary")

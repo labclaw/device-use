@@ -222,18 +222,19 @@ class TestBuildConstraints:
 # ── generate_report ─────────────────────────────────────────────
 
 class TestGenerateReport:
-    def _report(self, audit, spectrum, tmp_path, threshold=0.7):
+    def _report(self, audit, spectrum, tmp_path):
         report_path = generate_report(
-            audit, spectrum, str(tmp_path / "spectrum.png"), tmp_path, threshold,
+            audit, spectrum, str(tmp_path / "spectrum.png"), tmp_path,
         )
         return report_path.read_text()
 
     def test_threshold_respected_in_audit_trail(
         self, sample_audit_trail, sample_spectrum, tmp_path,
     ):
-        """Report should use the passed threshold, not hardcoded 0.7."""
+        """Report should use audit.threshold, not hardcoded 0.7."""
         # Score is 0.85. With threshold=0.9, it should show "No".
-        report = self._report(sample_audit_trail, sample_spectrum, tmp_path, threshold=0.9)
+        sample_audit_trail.threshold = 0.9
+        report = self._report(sample_audit_trail, sample_spectrum, tmp_path)
         assert "No" in report
 
     def test_contains_imrad_sections(self, sample_audit_trail, sample_spectrum, tmp_path):
