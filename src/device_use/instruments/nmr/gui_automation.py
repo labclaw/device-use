@@ -81,6 +81,16 @@ class TopSpinGUIAutomation:
         """Whether Computer Use is available (API key + SDK installed)."""
         return self._available
 
+    @property
+    def command_mode_available(self) -> bool:
+        """Whether command mode (AppleScript/xdotool) is available.
+
+        Command mode works without API key — it just types commands
+        into TopSpin's CLI. Available on macOS and Linux.
+        """
+        import platform
+        return platform.system() in ("Darwin", "Linux")
+
     def detect_topspin_window(self) -> bool:
         """Check if TopSpin GUI is visible on screen.
 
@@ -253,6 +263,11 @@ class TopSpinGUIAutomation:
                 timeout=5, capture_output=True,
             )
 
+    def verify_step(self, label: str) -> dict[str, Any]:
+        """Take a verification screenshot after a processing step."""
+        screenshot = self.take_screenshot()
+        return {"screenshot": screenshot, "label": label, "timestamp": time.time()}
+
     def open_dataset(self, dataset_path: str) -> None:
         """Open a dataset in TopSpin GUI."""
         cmd = TOPSPIN_COMMANDS["open_dataset"].format(path=dataset_path)
@@ -260,19 +275,26 @@ class TopSpinGUIAutomation:
         self.type_command(cmd)
         time.sleep(2)  # Wait for dataset to load
 
-    def process_spectrum(self) -> None:
+    def process_spectrum(
+        self,
+        verify: bool = False,
+        on_screenshot: Any | None = None,
+    ) -> None:
         """Run the standard processing pipeline via GUI commands.
 
-        Sends commands to TopSpin's command line:
-        1. efp  — exponential multiply + Fourier transform + phase
-        2. apbk — auto phase + baseline correction
-        3. ppf  — peak picking
+        Args:
+            verify: Take verification screenshot after each step.
+            on_screenshot: Callback receiving dict with screenshot bytes per step.
         """
-        commands = ["efp", "apbk", "ppf"]
-        for cmd in commands:
+        commands = [("efp", "fourier_transform"), ("apbk", "auto_phase_baseline"), ("ppf", "peak_pick")]
+        for cmd, label in commands:
             logger.info("GUI: Running %s", cmd)
             self.type_command(cmd)
-            time.sleep(3)  # Wait for each step to complete
+            time.sleep(3)
+            if verify:
+                result = self.verify_step(label)
+                if on_screenshot is not None:
+                    on_screenshot(result)
 
     def get_gui_status(self) -> dict[str, Any]:
         """Get current status of the GUI automation system."""

@@ -1,6 +1,6 @@
 """Tests for the NMR instrument modules (processor, adapter, brain, visualizer)."""
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import numpy as np
 import pytest
@@ -334,3 +334,39 @@ class TestSpectralLibrary:
 
         matches = lib.match_peaks([0.0], top_k=3)
         assert len(matches) == 3
+
+
+class TestTopSpinGUIAutomation:
+    """Tests for GUI automation module."""
+
+    def test_command_mode_no_api_key(self):
+        with patch.dict("os.environ", {}, clear=True):
+            from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
+            gui = TopSpinGUIAutomation()
+            assert not gui.available
+            assert gui.command_mode_available
+
+    def test_verify_returns_screenshot_bytes(self):
+        from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
+        gui = TopSpinGUIAutomation()
+        with patch.object(gui, "take_screenshot", return_value=b"fake_png"):
+            result = gui.verify_step("test")
+            assert result["screenshot"] == b"fake_png"
+            assert result["label"] == "test"
+            assert "timestamp" in result
+
+    def test_process_spectrum_with_verification(self):
+        from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
+        gui = TopSpinGUIAutomation()
+        screenshots = []
+        with patch.object(gui, "type_command"):
+            with patch.object(gui, "take_screenshot", return_value=b"png"):
+                gui.process_spectrum(verify=True, on_screenshot=screenshots.append)
+                assert len(screenshots) == 3
+
+    def test_process_spectrum_without_verification(self):
+        from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
+        gui = TopSpinGUIAutomation()
+        with patch.object(gui, "type_command"):
+            # Should not error even without verify
+            gui.process_spectrum(verify=False)

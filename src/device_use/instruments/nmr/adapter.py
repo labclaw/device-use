@@ -90,12 +90,17 @@ class TopSpinAdapter(BaseInstrument):
             return False
 
     def _connect_gui(self) -> bool:
-        """Check if TopSpin GUI is visible for Computer Use."""
+        """Check if TopSpin GUI is available for automation.
+
+        Supports two sub-modes:
+        - Agent mode: full Computer Use with VLM (needs API key)
+        - Command mode: AppleScript/xdotool typing (no API key needed)
+        """
         try:
             from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
 
             self._gui = TopSpinGUIAutomation()
-            if not self._gui.available:
+            if not self._gui.available and not self._gui.command_mode_available:
                 return False
             found = self._gui.detect_topspin_window()
             self._connected = found
@@ -187,16 +192,11 @@ class TopSpinAdapter(BaseInstrument):
         return self._process_via_nmrglue(dataset_path)
 
     def _process_via_gui(self, dataset_path: str) -> NMRSpectrum:
-        """Process using Computer Use GUI automation.
-
-        Visually operates the TopSpin GUI:
-        1. Open the dataset via command line
-        2. Run efp (FT + phase)
-        3. Run apbk (auto phase + baseline)
-        4. Run ppf (peak picking)
-        5. Read back result via nmrglue
-        """
+        """Process using GUI automation with verification screenshots."""
         self._gui.open_dataset(dataset_path)
-        self._gui.process_spectrum()
-        # Read back the processed data using nmrglue
+        self._gui_screenshots = []
+        self._gui.process_spectrum(
+            verify=True,
+            on_screenshot=self._gui_screenshots.append,
+        )
         return self._process_via_nmrglue(dataset_path)
