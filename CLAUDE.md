@@ -29,6 +29,7 @@ src/device_use/
       brain.py             # NMRBrain (Claude API + cache fallback)
       demo_cache.py        # Pre-cached expert responses for demos
       visualizer.py        # Publication-quality spectrum plots
+      library.py           # Spectral library + fingerprint matching
       gui_automation.py    # Computer Use GUI automation
     plate_reader/
       adapter.py           # PlateReaderAdapter (absorbance/fluorescence)
@@ -61,11 +62,14 @@ demos/
   lab_report_demo.py            # Raw data → paper-ready report
   streaming_demo.py             # Real-time event stream
   topspin_reaction_monitor.py   # Autonomous reaction monitoring
+  topspin_library.py            # Spectral library fingerprint matching
+  benchmark.py                  # Performance benchmark
+  showcase.py                   # All features in one script (pitch demo)
 
 tests/
   test_nmr.py              # NMR module tests
   test_plate_reader.py     # Plate reader + brain tests (22 tests)
-  test_orchestrator.py     # Pipeline + registry + parallel + retry tests (44 tests)
+  test_orchestrator.py     # Pipeline + registry + parallel + retry + hooks (53 tests)
   test_mcp_server.py       # MCP server integration tests (12 tests)
   test_tools.py            # External tool tests
   test_web.py              # Web API endpoint tests (16 tests)
@@ -78,7 +82,7 @@ tests/
 - **TopSpin 5.0.0** examdata at `/opt/topspin5.0.0/examdata/`
 - Install: `pip install -e ".[nmr,dev]"`
 - Run demos: `python demos/<script>.py` or `python -m device_use demo`
-- Run tests: `python -m pytest tests/` (336 tests)
+- Run tests: `python -m pytest tests/` (355 tests)
 - CLI: `python -m device_use status` / `instruments` / `demo`
 - Web GUI: `./demos/run_web.sh` (port 8420)
 
@@ -95,6 +99,9 @@ tests/
 - **MCP server**: `python -m device_use.integrations.mcp_server` for Claude Code
 - **Scaffold**: `device-use scaffold zeiss-zen` generates a new device package
 - **Pipeline viz**: `pipeline.describe()` (plan) and `result.summary()` (results)
+- **Middleware hooks**: `orch.before_step(fn)` / `orch.after_step(fn)` for safety/audit
+- **Composition**: `Pipeline.compose("name", p1, p2)` for reusable sub-pipelines
+- **Spectral library**: `SpectralLibrary.from_examdata()` for peak-fingerprint matching
 
 ## Git
 
