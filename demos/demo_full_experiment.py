@@ -336,12 +336,19 @@ def phase_discover(args: argparse.Namespace, spectrum_data: dict) -> dict:
     import urllib.error
 
     base = args.labclaw_url.rstrip("/")
+    api_token = os.environ.get("LABCLAW_API_TOKEN", "")
+
+    def _labclaw_headers() -> dict:
+        h = {"Content-Type": "application/json"}
+        if api_token:
+            h["Authorization"] = f"Bearer {api_token}"
+        return h
 
     # Health check
     sys.stdout.write(f"  {ARROW} Checking LabClaw health... ")
     sys.stdout.flush()
     try:
-        req = urllib.request.Request(f"{base}/api/health/status", method="GET")
+        req = urllib.request.Request(f"{base}/api/health", method="GET")
         with urllib.request.urlopen(req, timeout=5) as resp:
             health = json.loads(resp.read())
         print(f"{GREEN}ok{RESET} — {health.get('status', '?')}")
@@ -375,7 +382,7 @@ def phase_discover(args: argparse.Namespace, spectrum_data: dict) -> dict:
         req = urllib.request.Request(
             f"{base}/api/orchestrator/cycle",
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers=_labclaw_headers(),
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -389,8 +396,11 @@ def phase_discover(args: argparse.Namespace, spectrum_data: dict) -> dict:
     # Memory search
     try:
         ds_name = spectrum_data.get("dataset", {}).get("sample", "experiment")
+        headers = _labclaw_headers()
         req = urllib.request.Request(
-            f"{base}/api/memory/search?q={ds_name}&limit=3", method="GET",
+            f"{base}/api/memory/search/query?q={ds_name}&limit=3",
+            method="GET",
+            headers=headers,
         )
         with urllib.request.urlopen(req, timeout=10) as resp:
             memories = json.loads(resp.read())
