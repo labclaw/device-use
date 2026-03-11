@@ -161,7 +161,7 @@ def calculate_peak_coverage(
     if not spectrum.peaks:
         return 0.0
     top_peaks = sorted(
-        spectrum.peaks, key=lambda p: p.intensity, reverse=True,
+        spectrum.peaks, key=lambda p: abs(p.intensity), reverse=True,
     )[:top_n]
     mentioned = sum(
         1 for peak in top_peaks
@@ -209,7 +209,7 @@ def build_constraints(iteration: Iteration, spectrum: NMRSpectrum) -> str:
     if iteration.grounding_score < 0.5:
         issues.append("low peak coverage in analysis")
 
-    top_peaks = sorted(spectrum.peaks, key=lambda p: p.intensity, reverse=True)[:10]
+    top_peaks = sorted(spectrum.peaks, key=lambda p: abs(p.intensity), reverse=True)[:10]
     raw = iteration.hypothesis.raw_analysis
     unexplained = [
         f"{peak.ppm:.2f}" for peak in top_peaks
@@ -408,7 +408,6 @@ def find_dataset(
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.WARNING, format="%(name)s: %(message)s")
     args = parse_args()
     t_start = time.time()
     output_dir = Path(args.output)
@@ -468,7 +467,7 @@ def main() -> None:
     max_int = max(abs(p.intensity) for p in spectrum.peaks) if spectrum.peaks else 1.0
     if max_int == 0.0:
         max_int = 1.0
-    for peak in sorted(spectrum.peaks, key=lambda p: p.intensity, reverse=True)[:8]:
+    for peak in sorted(spectrum.peaks, key=lambda p: abs(p.intensity), reverse=True)[:8]:
         rel = peak.intensity / max_int * 100
         print(f"    d {peak.ppm:7.3f} ppm  {rel:5.1f}%  {DIM}{'█' * int(rel / 5)}{RESET}")
 
@@ -608,7 +607,7 @@ def main() -> None:
         grounding = calculate_grounding_score(
             formula_match, peak_coverage, lib_score,
         )
-        if hypothesis.compound_name == "Unknown":
+        if hypothesis.compound_name.strip().lower() == "unknown":
             grounding = 0.0
             warn("Unknown compound — grounding score forced to 0")
 
@@ -688,4 +687,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.WARNING, format="%(name)s: %(message)s")
     main()
