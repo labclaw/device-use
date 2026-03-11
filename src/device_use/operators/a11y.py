@@ -108,6 +108,8 @@ class AccessibilityOperator(BaseOperator):
         self._cf.CFArrayGetCount.argtypes = [c_void_p]
         self._cf.CFArrayGetValueAtIndex.restype = c_void_p
         self._cf.CFArrayGetValueAtIndex.argtypes = [c_void_p, ctypes.c_long]
+        self._cf.CFRetain.argtypes = [c_void_p]
+        self._cf.CFRetain.restype = c_void_p
 
         self._kCFStringEncodingUTF8 = 0x08000100
         self._STRING_TYPE_ID = self._cf.CFStringGetTypeID()
@@ -165,7 +167,12 @@ class AccessibilityOperator(BaseOperator):
             return []
         try:
             count = self._cf.CFArrayGetCount(ch)
-            return [self._cf.CFArrayGetValueAtIndex(ch, i) for i in range(count)]
+            children = []
+            for i in range(count):
+                child = self._cf.CFArrayGetValueAtIndex(ch, i)
+                self._cf.CFRetain(child)
+                children.append(child)
+            return children
         finally:
             self._cf.CFRelease(ch)
 
