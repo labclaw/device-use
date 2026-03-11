@@ -9,6 +9,8 @@ Operators provide layered control strategies:
 Each instrument defines which layers are available. The system tries
 the fastest available layer first, falling back as needed.
 """
+from __future__ import annotations
+
 from device_use.operators.a11y import AccessibilityOperator
 from device_use.operators.base import BaseOperator, ControlLayer
 

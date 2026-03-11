@@ -14,17 +14,48 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 import time
+from contextlib import contextmanager
 from ctypes import POINTER, byref, c_int32, c_uint32, c_void_p
 from typing import Any
 
+from device_use.operators.base import BaseOperator, ControlLayer, OperatorResult
 
-class AccessibilityOperator:
+
+class AccessibilityOperator(BaseOperator):
     """Read and control macOS applications via the Accessibility API."""
 
     def __init__(self, pid: int):
         self._pid = pid
         self._load_frameworks()
         self._app = self._ax.AXUIElementCreateApplication(pid)
+
+    # ------------------------------------------------------------------
+    # BaseOperator abstract methods
+    # ------------------------------------------------------------------
+    def available_layers(self) -> list[ControlLayer]:
+        """Return control layers this operator supports."""
+        return [ControlLayer.A11Y]
+
+    async def execute(
+        self,
+        command: str,
+        *,
+        layer: ControlLayer | None = None,
+        timeout_s: float = 30.0,
+    ) -> OperatorResult:
+        """Execute a command. Use specific methods like click_menu() instead."""
+        raise NotImplementedError(
+            "Use specific methods like click_menu(), read_state(), "
+            "or wait_for_status() for AccessibilityOperator."
+        )
+
+    async def read_state(self) -> dict[str, Any]:
+        """Read comprehensive application state (async wrapper)."""
+        return self.read_state_sync()
+
+    async def wait_ready(self, timeout_s: float = 10.0) -> bool:
+        """Wait until the application is ready for the next command."""
+        return self.wait_for_status("done", timeout_s=timeout_s)
 
     # ------------------------------------------------------------------
     # Framework loading
@@ -79,6 +110,16 @@ class AccessibilityOperator:
             None, s.encode("utf-8"), self._kCFStringEncodingUTF8
         )
 
+    @contextmanager
+    def _temp_cfstr(self, s: str):
+        """Create a CFString and release it when done."""
+        ref = self._cfstr(s)
+        try:
+            yield ref
+        finally:
+            if ref:
+                self._cf.CFRelease(ref)
+
     def _to_py(self, ref: c_void_p) -> str | None:
         if not ref:
             return None
@@ -93,9 +134,10 @@ class AccessibilityOperator:
 
     def _get_attr(self, el: c_void_p, name: str) -> tuple[int, c_void_p]:
         val = c_void_p()
-        err = self._ax.AXUIElementCopyAttributeValue(
-            el, self._cfstr(name), byref(val)
-        )
+        with self._temp_cfstr(name) as cf_name:
+            err = self._ax.AXUIElementCopyAttributeValue(
+                el, cf_name, byref(val)
+            )
         return err, val.value
 
     def _get_str(self, el: c_void_p, name: str) -> str | None:
@@ -151,8 +193,8 @@ class AccessibilityOperator:
                 return self._get_str(child, "AXValue")
         return None
 
-    def read_state(self) -> dict[str, Any]:
-        """Read comprehensive application state."""
+    def read_state_sync(self) -> dict[str, Any]:
+        """Read comprehensive application state (synchronous)."""
         texts = self.get_status_text()
         return {
             "window_title": self.get_window_title(),
@@ -192,34 +234,44 @@ class AccessibilityOperator:
 
         current_children = self._get_children(menubar)
         for i, name in enumerate(path):
-            found = False
-            for child in current_children:
-                title = self._get_str(child, "AXTitle")
-                if title and name.lower() in title.lower():
-                    if i == len(path) - 1:
-                        # Last item — click it
-                        err = self._ax.AXUIElementPerformAction(
-                            child, self._cfstr("AXPress")
-                        )
-                        return err == 0
-                    else:
-                        # Intermediate menu — descend
-                        current_children = self._get_children(child)
-                        # Flatten: menus have one submenu child containing items
-                        if current_children:
-                            expanded = []
-                            for c in current_children:
-                                r = self._get_str(c, "AXRole")
-                                if r in ("AXMenu", "AXList"):
-                                    expanded.extend(self._get_children(c))
-                                else:
-                                    expanded.append(c)
-                            current_children = expanded
-                        found = True
-                        break
-            if not found:
+            match = self._find_menu_match(current_children, name)
+            if match is None:
                 return False
+            if i == len(path) - 1:
+                # Last item — click it
+                with self._temp_cfstr("AXPress") as cf_press:
+                    err = self._ax.AXUIElementPerformAction(match, cf_press)
+                return err == 0
+            else:
+                # Intermediate menu — descend
+                current_children = self._get_children(match)
+                # Flatten: menus have one submenu child containing items
+                if current_children:
+                    expanded = []
+                    for c in current_children:
+                        r = self._get_str(c, "AXRole")
+                        if r in ("AXMenu", "AXList"):
+                            expanded.extend(self._get_children(c))
+                        else:
+                            expanded.append(c)
+                    current_children = expanded
         return False
+
+    def _find_menu_match(
+        self, children: list[c_void_p], name: str
+    ) -> c_void_p | None:
+        """Find a menu child by title — exact match first, then substring."""
+        name_lower = name.lower()
+        substring_match = None
+        for child in children:
+            title = self._get_str(child, "AXTitle")
+            if not title:
+                continue
+            if title.lower() == name_lower:
+                return child  # Exact match — return immediately
+            if substring_match is None and name_lower in title.lower():
+                substring_match = child
+        return substring_match
 
     # ------------------------------------------------------------------
     # Public API: Toolbar
@@ -253,11 +305,10 @@ class AccessibilityOperator:
         poll_interval: float = 0.3,
     ) -> bool:
         """Poll status text until it contains the expected string."""
+        target = contains.lower()
         deadline = time.monotonic() + timeout_s
         while time.monotonic() < deadline:
-            texts = self.get_status_text()
-            for t in texts:
-                if contains.lower() in t.lower():
-                    return True
+            if any(target in t.lower() for t in self.get_status_text()):
+                return True
             time.sleep(poll_interval)
         return False

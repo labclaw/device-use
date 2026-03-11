@@ -152,13 +152,26 @@ class TestAccessibilityOperatorInit:
         assert op._cf is cf
         assert op._ax is ax
 
+    def test_is_base_operator_subclass(self):
+        op, cf, ax = _create_operator_with_mocks()
+        assert isinstance(op, BaseOperator)
+
+    def test_available_layers(self):
+        op, cf, ax = _create_operator_with_mocks()
+        assert op.available_layers() == [ControlLayer.A11Y]
+
+    async def test_execute_raises_not_implemented(self):
+        op, cf, ax = _create_operator_with_mocks()
+        with pytest.raises(NotImplementedError, match="click_menu"):
+            await op.execute("ft")
+
 
 class TestAccessibilityOperatorReadState:
     def test_read_state_no_window(self):
         op, cf, ax = _create_operator_with_mocks()
         # AXFocusedWindow fails (err != 0)
         ax.AXUIElementCopyAttributeValue.return_value = -25204
-        state = op.read_state()
+        state = op.read_state_sync()
         assert state["window_title"] is None
         assert state["command_input"] is None
         assert state["status_lines"] == []
@@ -176,7 +189,7 @@ class TestAccessibilityOperatorReadState:
         op.get_command_input = MagicMock(return_value="ft")
         op.get_status_text = MagicMock(return_value=["dataset: test_1H", "done"])
 
-        state = op.read_state()
+        state = op.read_state_sync()
         assert state["window_title"] == "TopSpin - test_1H"
         assert state["command_input"] == "ft"
         assert state["status_lines"] == ["dataset: test_1H", "done"]
@@ -189,7 +202,7 @@ class TestAccessibilityOperatorReadState:
         op.get_command_input = MagicMock(return_value=None)
         op.get_status_text = MagicMock(return_value=["processing..."])
 
-        state = op.read_state()
+        state = op.read_state_sync()
         assert state["dataset"] == "processing..."
         assert state["last_command_status"] is None
 
