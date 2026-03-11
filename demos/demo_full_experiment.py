@@ -283,7 +283,22 @@ def phase_instrument(args: argparse.Namespace) -> dict:
 
         b64 = _screenshot_to_b64(png)
 
-        # Step 3: Build task description
+        # Step 3: Retrieve device documentation for CU context
+        docs_context = ""
+        try:
+            from device_use.knowledge import retrieve_docs
+            task_desc = f"load dataset process NMR spectrum efp command line"
+            docs_context = retrieve_docs(
+                "bruker-topspin", task_desc,
+                skills_dir=Path(__file__).resolve().parents[2] / "device-skills",
+                max_results=4, max_chars=3000,
+            )
+            if docs_context:
+                print(f"  {CHECK} Loaded {len(docs_context)} chars of TopSpin 5.0.0 official docs")
+        except Exception as e:
+            print(f"  {DIM}Docs retrieval skipped: {e}{RESET}")
+
+        # Step 4: Build task description with docs context
         dataset = args.dataset
         expno = args.expno
         task = (
@@ -292,9 +307,11 @@ def phase_instrument(args: argparse.Namespace) -> dict:
             f"'re /opt/topspin5.0.0/examdata/{dataset}/{expno}' and press Enter. "
             f"Then run Fourier transform by typing 'efp' and press Enter."
         )
+        if docs_context:
+            task += f"\n\n## Official TopSpin 5.0.0 Documentation Reference\n{docs_context}"
         print(f"  {ARROW} CU task: {DIM}{task[:80]}...{RESET}")
 
-        # Step 4: Send initial request to GPT-5.4
+        # Step 5: Send initial request to GPT-5.4
         client = _get_openai()
         print(f"  {ARROW} Sending to {args.cu_model}...")
         t0 = time.time()
