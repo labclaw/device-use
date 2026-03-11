@@ -145,6 +145,7 @@ class DeviceAgent:
                         reasoning=plan.get("reasoning", ""),
                         screenshot=screenshot,
                         success=False,
+                        call_id=plan.get("call_id"),
                     ))
                     self._history.compact()
                     if consecutive_parse_failures >= max_parse_failures:
@@ -172,6 +173,7 @@ class DeviceAgent:
                     reasoning=plan.get("reasoning", ""),
                     screenshot=verify_screenshot,
                     success=result.success,
+                    call_id=plan.get("call_id"),
                 ))
                 self._history.compact()
 
@@ -232,6 +234,7 @@ class DeviceAgent:
                 "action": e.action,
                 "result": "success" if e.success else "failed",
                 "observation": e.observation[:200],
+                "call_id": e.call_id,
             }
             for e in self._history.entries
         ]

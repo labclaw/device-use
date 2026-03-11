@@ -21,6 +21,7 @@ class HistoryEntry:
     reasoning: str = ""
     screenshot: bytes | None = None
     success: bool = True
+    call_id: str | None = None
 
 
 class AgentHistory:
