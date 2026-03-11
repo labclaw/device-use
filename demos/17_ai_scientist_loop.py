@@ -256,7 +256,7 @@ def generate_report(
     final = audit.final_hypothesis
     last = audit.iterations[-1] if audit.iterations else None
     status = "ACCEPTED" if audit.accepted else "INCONCLUSIVE"
-    max_int = max(p.intensity for p in spectrum.peaks) if spectrum.peaks else 1.0
+    max_int = max(abs(p.intensity) for p in spectrum.peaks) if spectrum.peaks else 1.0
     if max_int == 0.0:
         max_int = 1.0
 
@@ -408,6 +408,7 @@ def find_dataset(
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.WARNING, format="%(name)s: %(message)s")
     args = parse_args()
     t_start = time.time()
     output_dir = Path(args.output)
@@ -464,7 +465,7 @@ def main() -> None:
        f"{spectrum.frequency_mhz:.0f} MHz | {spectrum.solvent}")
 
     section("Top Peaks")
-    max_int = max(p.intensity for p in spectrum.peaks) if spectrum.peaks else 1.0
+    max_int = max(abs(p.intensity) for p in spectrum.peaks) if spectrum.peaks else 1.0
     if max_int == 0.0:
         max_int = 1.0
     for peak in sorted(spectrum.peaks, key=lambda p: p.intensity, reverse=True)[:8]:
@@ -561,14 +562,16 @@ def main() -> None:
             logger.error("AI streaming failed: %s", exc)
             print()
             err(f"AI analysis failed: {exc}")
-            sys.exit(1)
+            warn("Stopping iteration — will report best result so far")
+            break
         dt = time.time() - t0
         print(f"\n  {CYAN}{'─' * 56}{RESET}")
         info(f"  Analysis complete ({dt:.1f}s)")
 
         if not response_text.strip():
             err("AI returned empty response — cannot form hypothesis")
-            sys.exit(1)
+            warn("Stopping iteration — will report best result so far")
+            break
 
         hypothesis = parse_hypothesis(response_text)
         print()
@@ -605,6 +608,9 @@ def main() -> None:
         grounding = calculate_grounding_score(
             formula_match, peak_coverage, lib_score,
         )
+        if hypothesis.compound_name == "Unknown":
+            grounding = 0.0
+            warn("Unknown compound — grounding score forced to 0")
 
         section("Grounding Score")
         print(f"    Formula match  (0.3): "
