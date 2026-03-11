@@ -87,7 +87,7 @@ def main():
     elif args.command == "demo":
         _demo(args.name)
     else:
-        parser.print_help()
+        _hero()
 
 
 def _list_profiles():
@@ -175,14 +175,9 @@ async def _interactive(args):
 
 def _instruments():
     """Show registered instruments and their tools."""
-    from device_use.instruments import ControlMode
-    from device_use.instruments.nmr.adapter import TopSpinAdapter
-    from device_use.instruments.plate_reader import PlateReaderAdapter
-    from device_use.orchestrator import Orchestrator
+    from device_use import create_orchestrator
 
-    orch = Orchestrator()
-    orch.register(TopSpinAdapter(mode=ControlMode.OFFLINE))
-    orch.register(PlateReaderAdapter(mode=ControlMode.OFFLINE))
+    orch = create_orchestrator()
 
     instruments = orch.registry.list_instruments()
     tools = orch.registry.list_tools()
@@ -201,11 +196,7 @@ def _instruments():
 
 def _status():
     """Show architecture status with live connection checks."""
-    from device_use.instruments import ControlMode
-    from device_use.instruments.nmr.adapter import TopSpinAdapter
-    from device_use.instruments.plate_reader import PlateReaderAdapter
-    from device_use.orchestrator import Orchestrator
-    from device_use.tools.pubchem import PubChemTool
+    from device_use import create_orchestrator
     from device_use.tools.tooluniverse import _TU_AVAILABLE
 
     print("""
@@ -221,13 +212,7 @@ def _status():
     print(f"  Cloud Brain:     {brain_status}")
 
     # Orchestrator
-    orch = Orchestrator()
-    nmr = TopSpinAdapter(mode=ControlMode.OFFLINE)
-    reader = PlateReaderAdapter(mode=ControlMode.OFFLINE)
-    orch.register(nmr)
-    orch.register(reader)
-
-    results = orch.connect_all()
+    orch = create_orchestrator()
     print(f"  Orchestrator:    {len(orch.registry.list_tools())} tools registered")
 
     # Instruments
@@ -262,6 +247,64 @@ def _demo(name: str):
     }
     script = demo_map[name]
     subprocess.run([sys.executable, script])
+
+
+def _hero():
+    """Show a quick overview when no command is given."""
+    import time
+    from device_use import create_orchestrator
+
+    print("""
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║   ██████╗ ███████╗██╗   ██╗██╗ ██████╗███████╗               ║
+║   ██╔══██╗██╔════╝██║   ██║██║██╔════╝██╔════╝               ║
+║   ██║  ██║█████╗  ██║   ██║██║██║     █████╗                 ║
+║   ██║  ██║██╔══╝  ╚██╗ ██╔╝██║██║     ██╔══╝                ║
+║   ██████╔╝███████╗ ╚████╔╝ ██║╚██████╗███████╗              ║
+║   ╚═════╝ ╚══════╝  ╚═══╝  ╚═╝ ╚═════╝╚══════╝  USE        ║
+║                                                              ║
+║   ROS for Lab Instruments — AI meets Physical Science        ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+""")
+
+    t0 = time.time()
+    orch = create_orchestrator()
+    dt = time.time() - t0
+
+    instruments = orch.registry.list_instruments()
+    tools = orch.registry.list_tools()
+
+    print(f"  Middleware ready in {dt:.2f}s")
+    print(f"  {len(instruments)} instruments, {len(tools)} tools\n")
+
+    for inst in instruments:
+        obj = orch.registry.get_instrument(inst.name)
+        status = "connected" if obj.connected else "offline"
+        modes = ", ".join(m.value for m in inst.supported_modes)
+        print(f"    {inst.name:<16} {inst.vendor:<10} [{modes}] {status}")
+
+    # Quick data summary
+    nmr_count = len(orch.call_tool("topspin.list_datasets"))
+    plate_count = len(orch.call_tool("platereader.list_datasets"))
+    print(f"\n  Data: {nmr_count} NMR datasets, {plate_count} plate assays")
+
+    import os
+    has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    print(f"  AI:   {'Claude API ready' if has_key else 'demo mode (cached responses)'}")
+
+    print("""
+  Commands:
+    python -m device_use status         Architecture overview
+    python -m device_use instruments    List instruments + tools
+    python -m device_use demo           Run multi-instrument demo
+
+  Demos:
+    python demos/quickstart.py          30-second intro
+    python demos/topspin_identify.py    AI compound identification
+    python demos/lab_report_demo.py     Raw data → paper-ready report
+""")
 
 
 if __name__ == "__main__":
