@@ -143,6 +143,45 @@ class TestPipeline:
         assert result is p
         assert len(p) == 2
 
+    def test_extend(self):
+        a = Pipeline("a")
+        a.add_step(PipelineStep(name="s1", handler=lambda ctx: 1))
+        b = Pipeline("b")
+        b.add_step(PipelineStep(name="s2", handler=lambda ctx: 2))
+
+        result = a.extend(b)
+        assert result is a
+        assert len(a) == 2
+
+    def test_compose(self):
+        load = Pipeline("load")
+        load.add_step(PipelineStep(name="read", handler=lambda ctx: "data"))
+        analyze = Pipeline("analyze")
+        analyze.add_step(PipelineStep(name="process", handler=lambda ctx: "result"))
+
+        full = Pipeline.compose("full", load, analyze)
+        assert full.name == "full"
+        assert len(full) == 2
+        assert full.steps[0].name == "read"
+        assert full.steps[1].name == "process"
+
+    def test_compose_runs(self):
+        """Composed pipeline executes correctly with context passing."""
+        orch = Orchestrator()
+
+        load = Pipeline("load")
+        load.add_step(PipelineStep(name="value", handler=lambda ctx: 42))
+
+        transform = Pipeline("transform")
+        transform.add_step(PipelineStep(
+            name="doubled", handler=lambda ctx: ctx["value"] * 2,
+        ))
+
+        full = Pipeline.compose("composed", load, transform)
+        result = orch.run(full)
+        assert result.success
+        assert result.outputs["doubled"] == 84
+
     def test_describe(self):
         p = Pipeline("my_pipeline")
         p.add_step(PipelineStep(name="load", tool_name="topspin.process"))

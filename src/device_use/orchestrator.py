@@ -290,6 +290,27 @@ class Pipeline:
         self.steps.append(step)
         return self
 
+    def extend(self, other: Pipeline) -> Pipeline:
+        """Append all steps from another pipeline. Returns self for chaining."""
+        self.steps.extend(other.steps)
+        return self
+
+    @classmethod
+    def compose(cls, name: str, *pipelines: Pipeline, description: str = "") -> Pipeline:
+        """Compose multiple pipelines into one.
+
+        Steps are concatenated in order. This enables building complex
+        workflows from reusable sub-pipelines:
+
+            load = Pipeline("load").add_step(...)
+            analyze = Pipeline("analyze").add_step(...)
+            full = Pipeline.compose("full_workflow", load, analyze)
+        """
+        composed = cls(name, description=description)
+        for p in pipelines:
+            composed.steps.extend(p.steps)
+        return composed
+
     def __len__(self) -> int:
         return len(self.steps)
 
