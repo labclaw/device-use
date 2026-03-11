@@ -73,6 +73,12 @@ class ScreenshotAction(BaseAction):
     action_type: ActionType = ActionType.SCREENSHOT
 
 
+class MoveAction(BaseAction):
+    action_type: ActionType = ActionType.MOVE
+    x: int
+    y: int
+
+
 # Union type for dispatch
 Action = (
     ClickAction
@@ -84,6 +90,7 @@ Action = (
     | DragAction
     | WaitAction
     | ScreenshotAction
+    | MoveAction
 )
 
 
@@ -117,6 +124,7 @@ def parse_action(data: dict) -> Action:
         ActionType.DRAG: DragAction,
         ActionType.WAIT: WaitAction,
         ActionType.SCREENSHOT: ScreenshotAction,
+        ActionType.MOVE: MoveAction,
     }
     cls = type_map.get(action_type)
     if cls is None:

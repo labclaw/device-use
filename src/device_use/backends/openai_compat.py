@@ -420,13 +420,29 @@ class OpenAICompatBackend:
             action["keys"] = cu.get("keys", [])
         elif action_type == "scroll":
             action["coordinates"] = [cu.get("x", 0), cu.get("y", 0)]
-            action["dx"] = cu.get("scroll_x", 0)
-            action["dy"] = cu.get("scroll_y", 0)
+            scroll_y = cu.get("scroll_y", 0)
+            # Map scroll_y to clicks: negative scroll_y = scroll down = negative clicks
+            # GPT-5.4 uses pixel deltas; convert to discrete clicks (120px per click)
+            action["clicks"] = scroll_y // 120 if abs(scroll_y) >= 120 else (
+                -1 if scroll_y < 0 else (1 if scroll_y > 0 else 0)
+            )
         elif action_type == "drag":
-            action["coordinates"] = [cu.get("x", 0), cu.get("y", 0)]
+            path = cu.get("path") or []
+            if len(path) >= 2:
+                start = path[0]
+                end = path[-1]
+                action["start_x"] = start.get("x", 0) if isinstance(start, dict) else getattr(start, "x", 0)
+                action["start_y"] = start.get("y", 0) if isinstance(start, dict) else getattr(start, "y", 0)
+                action["end_x"] = end.get("x", 0) if isinstance(end, dict) else getattr(end, "x", 0)
+                action["end_y"] = end.get("y", 0) if isinstance(end, dict) else getattr(end, "y", 0)
+            else:
+                # Fallback: no valid path, use zero coordinates
+                action["start_x"] = 0
+                action["start_y"] = 0
+                action["end_x"] = 0
+                action["end_y"] = 0
         elif action_type == "move":
             action["coordinates"] = [cu.get("x", 0), cu.get("y", 0)]
-            action["action_type"] = "move"
         elif action_type == "screenshot":
             action["action_type"] = "screenshot"
         elif action_type == "wait":

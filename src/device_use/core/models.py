@@ -28,6 +28,7 @@ class ActionType(str, Enum):
     DRAG = "drag"
     WAIT = "wait"
     SCREENSHOT = "screenshot"
+    MOVE = "move"
 
 
 class ScreenDefinition(BaseModel):

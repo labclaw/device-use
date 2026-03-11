@@ -21,6 +21,7 @@ from device_use.actions.models import (
     DoubleClickAction,
     DragAction,
     HotkeyAction,
+    MoveAction,
     RightClickAction,
     ScreenshotAction,
     ScrollAction,
@@ -156,6 +157,10 @@ class ActionExecutor:
         elif isinstance(action, ScreenshotAction):
             pass  # No-op — screenshot is captured by the agent loop
 
+        elif isinstance(action, MoveAction):
+            x, y = self._scale(action.x, action.y)
+            pyautogui.moveTo(x, y)
+
         else:
             raise ValueError(f"Unknown action type: {type(action)}")
 
@@ -189,6 +194,8 @@ class ActionExecutor:
             params = {"end_x": ex, "end_y": ey}
         elif isinstance(action, WaitAction):
             params = {"seconds": action.seconds}
+        elif isinstance(action, MoveAction):
+            coords = self._scale(action.x, action.y)
 
         return ActionRequest(
             action_type=action.action_type,
