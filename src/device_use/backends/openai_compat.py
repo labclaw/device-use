@@ -1,4 +1,4 @@
-"""OpenAI-compatible VLM backend for GPT-4o, Gemini, GLM, etc."""
+"""OpenAI-compatible VLM backend — GPT-5.4 Computer Use + legacy chat fallback."""
 
 from __future__ import annotations
 
@@ -13,16 +13,30 @@ from openai import AsyncOpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
 
+# Models that support native computer use via Responses API
+_COMPUTER_USE_MODELS = frozenset({
+    "gpt-5.4",
+    "gpt-5.4-pro",
+    "computer-use-preview",
+    "computer-use-preview-2025-03-11",
+})
+
+
+def _supports_computer_use(model: str) -> bool:
+    """Check if model supports native computer use tool."""
+    return any(model.startswith(m) for m in _COMPUTER_USE_MODELS)
+
 
 class OpenAICompatBackend:
-    """VLM backend using OpenAI-compatible API (GPT-4o, Gemini, GLM, etc.).
+    """VLM backend using OpenAI API.
 
-    Implements VisionBackend protocol.
+    For GPT-5.4+: Uses Responses API with native computer use tool.
+    For older models (GPT-4o etc.): Falls back to chat completions with prompts.
     """
 
     def __init__(
         self,
-        model: str = "gpt-4o",
+        model: str = "gpt-5.4",
         api_key: str | None = None,
         base_url: str | None = None,
         max_tokens: int = 4096,
@@ -30,16 +44,338 @@ class OpenAICompatBackend:
         self._model = model
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self._max_tokens = max_tokens
+        self._native_cu = _supports_computer_use(model)
         self.system_prompt: str = ""
+
+        # State for Responses API continuation
+        self._previous_response_id: str | None = None
 
     @property
     def supports_grounding(self) -> bool:
-        """GPT-4o and most OpenAI-compatible models cannot output coordinates."""
-        return False
+        """GPT-5.4+ supports native pixel coordinates via computer use."""
+        return self._native_cu
+
+    # ------------------------------------------------------------------
+    # Responses API path (GPT-5.4 computer use)
+    # ------------------------------------------------------------------
 
     @backoff.on_exception(backoff.expo, RateLimitError, max_tries=5)
-    async def _call(self, messages: list[dict], temperature: float = 0.0) -> str:
-        """Call OpenAI-compatible API with retry on rate limits."""
+    async def _responses_create(self, **kwargs: Any) -> Any:
+        """Call Responses API with retry on rate limits."""
+        return await self._client.responses.create(**kwargs)
+
+    async def _computer_use_step(
+        self,
+        screenshot: bytes,
+        task: str,
+        call_id: str | None = None,
+    ) -> Any:
+        """Execute one step of the GPT-5.4 computer use loop.
+
+        First call: send task as input text + initial screenshot.
+        Subsequent calls: send computer_call_output with new screenshot.
+
+        Uses Responses API with tools=[{"type": "computer"}].
+        See: https://developers.openai.com/api/docs/guides/tools-computer-use
+        """
+        b64 = base64.b64encode(screenshot).decode("utf-8")
+        image_url = f"data:image/png;base64,{b64}"
+
+        if call_id is not None and self._previous_response_id is not None:
+            # Continuation: send computer_call_output per SDK spec
+            # Type: ComputerCallOutput TypedDict
+            input_items: list[dict[str, Any]] = [{
+                "type": "computer_call_output",
+                "call_id": call_id,
+                "output": {
+                    "type": "computer_screenshot",
+                    "image_url": image_url,
+                },
+            }]
+            response = await self._responses_create(
+                model=self._model,
+                tools=[{"type": "computer"}],
+                previous_response_id=self._previous_response_id,
+                input=input_items,
+            )
+        else:
+            # Initial call: EasyInputMessageParam with text + image
+            input_items = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": task},
+                        {
+                            "type": "input_image",
+                            "image_url": image_url,
+                            "detail": "original",
+                        },
+                    ],
+                }
+            ]
+            kwargs: dict[str, Any] = {
+                "model": self._model,
+                "tools": [{"type": "computer"}],
+                "input": input_items,
+            }
+            if self.system_prompt:
+                kwargs["instructions"] = self.system_prompt
+            response = await self._responses_create(**kwargs)
+
+        self._previous_response_id = response.id
+        return response
+
+    def _extract_computer_calls(
+        self, response: Any
+    ) -> list[dict[str, Any]]:
+        """Extract all computer_call actions from response output.
+
+        GPT-5.4 uses `actions` (list). Older models use `action` (single).
+        SDK types (from openai.types.responses.computer_action):
+          Click(type, x, y, button), DoubleClick(type, x, y),
+          Drag(type, path), Keypress(type, keys), Move(type, x, y),
+          Screenshot(type), Scroll(type, x, y, scroll_x, scroll_y),
+          Type(type, text), Wait(type)
+        """
+        results: list[dict[str, Any]] = []
+        for item in response.output:
+            if item.type != "computer_call":
+                continue
+
+            call_id = item.call_id
+
+            # Collect actions: prefer `actions` list, fall back to single `action`
+            actions = item.actions or []
+            if not actions and item.action is not None:
+                actions = [item.action]
+            actions = [a for a in actions if a is not None]
+            if not actions:
+                logger.warning("computer_call %s has no actions", call_id)
+                continue
+
+            for action in actions:
+                results.append({
+                    "call_id": call_id,
+                    "action_type": action.type,
+                    "x": getattr(action, "x", None),
+                    "y": getattr(action, "y", None),
+                    "button": getattr(action, "button", None),
+                    "text": getattr(action, "text", None),
+                    "keys": getattr(action, "keys", None),
+                    "scroll_x": getattr(action, "scroll_x", None),
+                    "scroll_y": getattr(action, "scroll_y", None),
+                    "path": getattr(action, "path", None),
+                })
+        return results
+
+    def _extract_text(self, response: Any) -> str:
+        """Extract text output from response."""
+        return getattr(response, "output_text", "") or ""
+
+    def reset_session(self) -> None:
+        """Reset the Responses API session (clear previous_response_id)."""
+        self._previous_response_id = None
+
+    # ------------------------------------------------------------------
+    # VisionBackend protocol methods
+    # ------------------------------------------------------------------
+
+    async def observe(
+        self, screenshot: bytes, context: str = ""
+    ) -> dict[str, Any]:
+        """Describe what's visible on screen using vision model."""
+        if self._native_cu:
+            # For GPT-5.4: use a one-shot responses call (no computer tool)
+            b64 = base64.b64encode(screenshot).decode("utf-8")
+            prompt = (
+                "Describe the current screen state. "
+                "Return JSON: {\"description\": \"...\", \"elements\": "
+                "[{\"name\": \"...\", \"type\": \"...\", \"description\": \"...\"}]}"
+            )
+            if context:
+                prompt = f"Context: {context}\n\n{prompt}"
+
+            response = await self._responses_create(
+                model=self._model,
+                input=[{
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": prompt},
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:image/png;base64,{b64}",
+                            "detail": "original",
+                        },
+                    ],
+                }],
+            )
+            raw = self._extract_text(response)
+            try:
+                return json.loads(_strip_markdown_fences(raw))
+            except json.JSONDecodeError:
+                return {"description": raw, "elements": []}
+
+        # Legacy path: chat completions
+        return await self._observe_legacy(screenshot, context)
+
+    async def plan(
+        self,
+        screenshot: bytes,
+        task: str,
+        history: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Plan next action given current screen state and task.
+
+        For GPT-5.4: Uses native computer use — model returns structured
+        actions with pixel coordinates directly.
+
+        For legacy models: Uses chat completions with prompt engineering.
+        """
+        if self._native_cu:
+            return await self._plan_native(screenshot, task, history)
+        return await self._plan_legacy(screenshot, task, history)
+
+    async def locate(
+        self, screenshot: bytes, element_description: str
+    ) -> tuple[int, int] | None:
+        """Find coordinates of a UI element.
+
+        GPT-5.4 supports this natively via computer use.
+        Legacy models return None (no grounding).
+        """
+        if self._native_cu:
+            b64 = base64.b64encode(screenshot).decode("utf-8")
+            prompt = (
+                f"Find the UI element: {element_description}\n"
+                "Return JSON: {\"x\": 123, \"y\": 456} or {\"x\": null, \"y\": null}"
+            )
+            response = await self._responses_create(
+                model=self._model,
+                input=[{
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": prompt},
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:image/png;base64,{b64}",
+                            "detail": "original",
+                        },
+                    ],
+                }],
+            )
+            raw = self._extract_text(response)
+            try:
+                data = json.loads(_strip_markdown_fences(raw))
+                x, y = data.get("x"), data.get("y")
+                if x is not None and y is not None:
+                    return (int(x), int(y))
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+        return None
+
+    # ------------------------------------------------------------------
+    # GPT-5.4 native computer use plan
+    # ------------------------------------------------------------------
+
+    async def _plan_native(
+        self,
+        screenshot: bytes,
+        task: str,
+        history: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Use GPT-5.4 Responses API with computer use tool."""
+        # Build task context with history
+        full_task = task
+        if history:
+            recent = history[-5:]
+            steps_text = "\n".join(
+                f"- Step {h.get('step', '?')}: {h.get('action', '?')} → {h.get('result', '?')}"
+                for h in recent
+            )
+            full_task = f"{task}\n\nPrevious steps:\n{steps_text}"
+
+        # Determine if this is a continuation or initial call
+        call_id = None
+        if history and self._previous_response_id:
+            # We're continuing — need last call_id from history
+            last = history[-1] if history else {}
+            call_id = last.get("call_id")
+
+        response = await self._computer_use_step(screenshot, full_task, call_id)
+
+        # Extract computer_call actions
+        cu_actions = self._extract_computer_calls(response)
+        if cu_actions:
+            # Return the first action (agent loop handles one at a time)
+            mapped = self._map_cu_action(cu_actions[0])
+            # Attach remaining actions for callers that want batch execution
+            if len(cu_actions) > 1:
+                mapped["_remaining_actions"] = [
+                    self._map_cu_action(a) for a in cu_actions[1:]
+                ]
+            return mapped
+
+        # No computer_call — model is done or gave text response
+        text = self._extract_text(response)
+        return {
+            "reasoning": text or "Task completed",
+            "action": {"action_type": "wait", "seconds": 0},
+            "done": True,
+            "confidence": 1.0,
+            "data": {"response": text},
+        }
+
+    @staticmethod
+    def _map_cu_action(cu: dict[str, Any]) -> dict[str, Any]:
+        """Map GPT-5.4 computer_call action to VisionBackend plan format."""
+        action_type = cu["action_type"]
+        action: dict[str, Any] = {"action_type": action_type}
+
+        if action_type in ("click", "double_click", "right_click"):
+            action["coordinates"] = [cu["x"], cu["y"]]
+            if action_type == "right_click":
+                action["action_type"] = "click"
+                action["button"] = "right"
+            elif action_type == "double_click":
+                action["action_type"] = "double_click"
+        elif action_type == "type":
+            action["text"] = cu.get("text", "")
+        elif action_type == "keypress":
+            action["action_type"] = "hotkey"
+            action["keys"] = cu.get("keys", [])
+        elif action_type == "scroll":
+            action["coordinates"] = [cu.get("x", 0), cu.get("y", 0)]
+            action["dx"] = cu.get("scroll_x", 0)
+            action["dy"] = cu.get("scroll_y", 0)
+        elif action_type == "drag":
+            action["coordinates"] = [cu.get("x", 0), cu.get("y", 0)]
+        elif action_type == "move":
+            action["coordinates"] = [cu.get("x", 0), cu.get("y", 0)]
+            action["action_type"] = "move"
+        elif action_type == "screenshot":
+            action["action_type"] = "screenshot"
+        elif action_type == "wait":
+            action["seconds"] = 1
+
+        return {
+            "reasoning": f"computer_use: {action_type}",
+            "action": action,
+            "done": False,
+            "confidence": 0.9,
+            "call_id": cu.get("call_id"),
+        }
+
+    # ------------------------------------------------------------------
+    # Legacy chat completions path (GPT-4o, etc.)
+    # ------------------------------------------------------------------
+
+    @backoff.on_exception(backoff.expo, RateLimitError, max_tries=5)
+    async def _chat_call(
+        self, messages: list[dict], temperature: float = 0.0
+    ) -> str:
+        """Call Chat Completions API with retry on rate limits."""
         response = await self._client.chat.completions.create(
             model=self._model,
             messages=messages,
@@ -49,13 +385,11 @@ class OpenAICompatBackend:
         return response.choices[0].message.content or ""
 
     def _encode_image(self, screenshot: bytes) -> str:
-        """Base64 encode a screenshot for the API."""
         return base64.b64encode(screenshot).decode("utf-8")
 
     def _make_image_content(
         self, screenshot: bytes, text: str
     ) -> list[dict[str, Any]]:
-        """Build multimodal content array with text and image."""
         b64 = self._encode_image(screenshot)
         return [
             {"type": "text", "text": text},
@@ -68,14 +402,9 @@ class OpenAICompatBackend:
             },
         ]
 
-    async def observe(
+    async def _observe_legacy(
         self, screenshot: bytes, context: str = ""
     ) -> dict[str, Any]:
-        """Describe what's visible on screen using vision model.
-
-        Returns:
-            Dict with "description" (str) and "elements" (list[dict]).
-        """
         prompt = (
             "You are a GUI analysis agent. Describe the current screen state.\n"
             "Return a JSON object with:\n"
@@ -92,31 +421,21 @@ class OpenAICompatBackend:
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
         messages.append({"role": "user", "content": content})
-        raw = await self._call(messages)
+        raw = await self._chat_call(messages)
 
         try:
             result = json.loads(_strip_markdown_fences(raw))
         except json.JSONDecodeError:
-            logger.warning("Failed to parse observe response as JSON: %s", raw[:200])
+            logger.warning("Failed to parse observe response: %s", raw[:200])
             result = {"description": raw, "elements": []}
-
         return result
 
-    async def plan(
+    async def _plan_legacy(
         self,
         screenshot: bytes,
         task: str,
         history: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        """Plan next action given current screen state and task.
-
-        Since GPT-4o doesn't support grounding, it returns element descriptions
-        rather than coordinates. The agent loop should use locate() or
-        an external grounding model (OmniParser) to get coordinates.
-
-        Returns:
-            Dict with "action", "reasoning", "done", and "confidence".
-        """
         prompt = (
             "You are a GUI automation agent. Given the screenshot and task, "
             "plan the next action.\n"
@@ -138,30 +457,19 @@ class OpenAICompatBackend:
         if self.system_prompt:
             messages.append({"role": "system", "content": self.system_prompt})
         messages.append({"role": "user", "content": content})
-        raw = await self._call(messages)
+        raw = await self._chat_call(messages)
 
         try:
             result = json.loads(_strip_markdown_fences(raw))
         except json.JSONDecodeError:
-            logger.warning("Failed to parse plan response as JSON: %s", raw[:200])
+            logger.warning("Failed to parse plan response: %s", raw[:200])
             result = {
                 "action": {"action_type": "wait", "seconds": 1},
                 "reasoning": raw,
                 "done": False,
                 "confidence": 0.0,
             }
-
         return result
-
-    async def locate(
-        self, screenshot: bytes, element_description: str
-    ) -> tuple[int, int] | None:
-        """Attempt to locate element by description.
-
-        Returns None since GPT-4o cannot output pixel coordinates.
-        The agent loop should fall back to OmniParser or similar.
-        """
-        return None
 
 
 def _strip_markdown_fences(text: str) -> str:

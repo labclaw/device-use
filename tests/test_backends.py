@@ -254,6 +254,51 @@ class TestMarkdownFenceStripping:
         assert result["description"] == "Desktop window"
 
 
+class TestExtractComputerCalls:
+    def test_extract_computer_calls_handles_none_actions(self):
+        """Regression: None actions in computer_call should not crash."""
+        from unittest.mock import MagicMock
+
+        backend = OpenAICompatBackend.__new__(OpenAICompatBackend)
+
+        mock_item = MagicMock()
+        mock_item.type = "computer_call"
+        mock_item.call_id = "test_call"
+        mock_item.actions = None
+        mock_item.action = None
+
+        mock_response = MagicMock()
+        mock_response.output = [mock_item]
+
+        results = backend._extract_computer_calls(mock_response)
+        assert results == []
+
+    def test_extract_computer_calls_filters_none_in_list(self):
+        """Regression: None values within actions list should be skipped."""
+        from unittest.mock import MagicMock
+
+        backend = OpenAICompatBackend.__new__(OpenAICompatBackend)
+
+        mock_action = MagicMock()
+        mock_action.type = "click"
+        mock_action.x = 100
+        mock_action.y = 200
+        mock_action.button = "left"
+
+        mock_item = MagicMock()
+        mock_item.type = "computer_call"
+        mock_item.call_id = "test_call"
+        mock_item.actions = [None, mock_action, None]
+        mock_item.action = None
+
+        mock_response = MagicMock()
+        mock_response.output = [mock_item]
+
+        results = backend._extract_computer_calls(mock_response)
+        assert len(results) == 1
+        assert results[0]["action_type"] == "click"
+
+
 class TestCallParameters:
     async def test_call_passes_correct_parameters(
         self, backend: OpenAICompatBackend
