@@ -384,6 +384,34 @@ class TestCreateOrchestrator:
         assert "topspin.list_datasets" in names
         assert "platereader.process" in names
 
+    def test_plugin_discovery(self):
+        """_discover_plugins returns empty dict when no plugins installed."""
+        from device_use import _discover_plugins
+        from device_use.instruments import ControlMode
+        plugins = _discover_plugins(ControlMode.OFFLINE)
+        # No external plugins installed in test env — should return empty or
+        # only built-in entry points
+        assert isinstance(plugins, dict)
+
+    def test_plugin_override(self, monkeypatch):
+        """Plugin instruments merge with built-ins."""
+        from device_use import create_orchestrator, _discover_plugins
+
+        # Mock _discover_plugins to return a fake instrument
+        def mock_discover(control_mode):
+            return {
+                "mock_plugin": lambda: MockInstrument(),
+            }
+        monkeypatch.setattr("device_use._discover_plugins", mock_discover)
+
+        orch = create_orchestrator()
+        instruments = orch.registry.list_instruments()
+        types = {i.instrument_type for i in instruments}
+        # Should have built-in + plugin
+        assert "spectrometer" in types  # MockInstrument type
+        assert "nmr" in types
+        assert "plate_reader" in types
+
 
 # ── Parallel Pipeline ────────────────────────────────────────
 

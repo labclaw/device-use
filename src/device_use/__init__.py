@@ -39,6 +39,37 @@ __all__ = [
 ]
 
 
+def _discover_plugins(control_mode) -> dict:
+    """Discover instrument plugins via Python entry points.
+
+    External instrument packages register via pyproject.toml:
+
+        [project.entry-points."device_use.instruments"]
+        my_instrument = "device_use_myinst:create_adapter"
+
+    The entry point callable receives a ControlMode and returns a
+    BaseInstrument instance.
+    """
+    import sys
+    if sys.version_info >= (3, 12):
+        from importlib.metadata import entry_points
+    else:
+        from importlib.metadata import entry_points
+
+    plugins = {}
+    try:
+        eps = entry_points(group="device_use.instruments")
+        for ep in eps:
+            try:
+                factory = ep.load()
+                plugins[ep.name] = lambda f=factory: f(control_mode)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return plugins
+
+
 def create_orchestrator(
     *,
     mode: str = "offline",
@@ -52,10 +83,14 @@ def create_orchestrator(
         from device_use import create_orchestrator
         orch = create_orchestrator()
 
+    Instruments are discovered from two sources:
+      1. Built-in instruments (nmr, plate_reader) bundled in this package
+      2. Plugin instruments installed via entry points (group: device_use.instruments)
+
     Args:
         mode: Control mode for all instruments ("offline", "api", "gui").
         instruments: List of instrument types to register. If None, registers
-            all available instruments. Options: "nmr", "plate_reader".
+            all available instruments.
         connect: Whether to connect all instruments after registration.
 
     Returns:
@@ -67,8 +102,8 @@ def create_orchestrator(
     orch = Orchestrator()
     control_mode = ControlMode(mode)
 
-    # Available instrument factories
-    _factories = {}
+    # Built-in instrument factories
+    _factories: dict = {}
 
     try:
         from device_use.instruments.nmr.adapter import TopSpinAdapter
@@ -81,6 +116,9 @@ def create_orchestrator(
         _factories["plate_reader"] = lambda: PlateReaderAdapter(mode=control_mode)
     except ImportError:
         pass
+
+    # Merge plugin-discovered instruments (plugins override built-ins)
+    _factories.update(_discover_plugins(control_mode))
 
     # Register requested or all available instruments
     targets = instruments or list(_factories.keys())
