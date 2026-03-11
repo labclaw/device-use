@@ -27,6 +27,7 @@ from device_use.safety.guard import SafetyGuard
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_STEPS = 30
+DEFAULT_MAX_CU_TURNS = 24
 
 
 class DeviceAgent:
@@ -48,11 +49,13 @@ class DeviceAgent:
         observer: Any | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
         max_images: int = 5,
+        max_cu_turns: int = DEFAULT_MAX_CU_TURNS,
     ):
         self._profile = profile
         self._backend = backend
         self._observer = observer
         self._max_steps = max_steps
+        self._max_cu_turns = max_cu_turns
         self._prompts = PromptBuilder(profile)
         self._history = AgentHistory(max_images=max_images)
         self._safety = SafetyGuard(profile, auto_approve=False)
@@ -266,3 +269,8 @@ class DeviceAgent:
     @property
     def profile(self) -> DeviceProfile:
         return self._profile
+
+    @property
+    def max_cu_turns(self) -> int:
+        """Maximum computer use turns for CU-mode execution."""
+        return self._max_cu_turns
