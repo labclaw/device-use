@@ -168,17 +168,29 @@ class DeviceAgent:
 
                 # Execute remaining batched actions (GPT-5.4 can return multiple)
                 remaining = plan.get("_remaining_actions", [])
-                for extra_plan in remaining:
-                    extra_data = extra_plan.get("action", {})
-                    try:
-                        extra_action = parse_action(extra_data)
-                    except (ValueError, KeyError, TypeError) as e:
-                        logger.warning("Skipping invalid batched action: %s", e)
-                        continue
-                    # 120ms inter-action delay (OpenAI CUA reference pattern)
-                    await asyncio.sleep(0.12)
-                    extra_result = self._executor.execute(extra_action)
-                    all_actions.append(extra_result)
+                if result.success:
+                    for extra_plan in remaining:
+                        extra_data = extra_plan.get("action", {})
+                        try:
+                            extra_action = parse_action(extra_data)
+                        except (ValueError, KeyError, TypeError) as e:
+                            logger.warning("Skipping invalid batched action: %s", e)
+                            continue
+                        # 120ms inter-action delay (OpenAI CUA reference pattern)
+                        await asyncio.sleep(0.12)
+                        extra_result = self._executor.execute(extra_action)
+                        all_actions.append(extra_result)
+                        if not extra_result.success:
+                            logger.warning(
+                                "Batched action failed, skipping remaining: %s",
+                                extra_result.error,
+                            )
+                            break
+                elif remaining:
+                    logger.warning(
+                        "Primary action failed, skipping %d remaining batched actions",
+                        len(remaining),
+                    )
 
                 # VERIFY
                 verify_screenshot = await self._capture_screenshot()

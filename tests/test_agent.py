@@ -337,6 +337,82 @@ class TestDeviceAgent:
         assert result.success is True  # Eventually completes after skipping bad action
 
 
+class TestBatchedActionStopsOnFailure:
+    """Batched GPT-5.4 actions must stop executing after a failure."""
+
+    @pytest.mark.asyncio
+    async def test_remaining_actions_skipped_after_primary_failure(self):
+        """If the primary action fails, remaining batched actions are not executed."""
+        profile = DeviceProfile(name="test", software="App")
+        backend = MockBackend(plan_responses=[
+            {
+                "reasoning": "Click then type",
+                "action": {"action_type": "click", "x": 50, "y": 50},
+                "done": False,
+                "_remaining_actions": [
+                    {"action": {"action_type": "type", "text": "dangerous"}},
+                ],
+            },
+            {"done": True},
+        ])
+        agent = DeviceAgent(profile, backend, max_steps=10)
+        agent._capture_screenshot = _mock_capture
+        agent._executor._settle_delay = 0
+
+        # Make executor return failure for the primary click action
+        from unittest.mock import MagicMock
+        original_execute = agent._executor.execute
+        call_count = 0
+
+        def failing_execute(action):
+            nonlocal call_count
+            call_count += 1
+            req = ActionRequest(action_type=ActionType.CLICK)
+            return ActionResult(success=False, action=req, error="Click blocked")
+
+        agent._executor.execute = failing_execute
+
+        result = await agent.execute("Click and type")
+        # Only 1 action should have been attempted (the primary click)
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_remaining_actions_stop_after_batched_failure(self):
+        """If a batched action fails mid-sequence, subsequent ones are skipped."""
+        profile = DeviceProfile(name="test", software="App")
+        backend = MockBackend(plan_responses=[
+            {
+                "reasoning": "Three actions",
+                "action": {"action_type": "click", "x": 10, "y": 10},
+                "done": False,
+                "_remaining_actions": [
+                    {"action": {"action_type": "click", "x": 20, "y": 20}},
+                    {"action": {"action_type": "type", "text": "should not run"}},
+                ],
+            },
+            {"done": True},
+        ])
+        agent = DeviceAgent(profile, backend, max_steps=10)
+        agent._capture_screenshot = _mock_capture
+        agent._executor._settle_delay = 0
+
+        call_count = 0
+
+        def second_fails(action):
+            nonlocal call_count
+            call_count += 1
+            req = ActionRequest(action_type=ActionType.CLICK)
+            if call_count == 2:
+                return ActionResult(success=False, action=req, error="Blocked")
+            return ActionResult(success=True, action=req)
+
+        agent._executor.execute = second_fails
+
+        result = await agent.execute("Multi-action task")
+        # Primary succeeds (1), first batched fails (2), third is skipped
+        assert call_count == 2
+
+
 class TestMaxCUTurnsForwarded:
     """Verify that max_cu_turns is forwarded from DeviceAgent to run_cu_loop."""
 
@@ -421,5 +497,17 @@ class TestMaxCUTurnsForwarded:
 
 async def _mock_capture() -> bytes:
     """Return a minimal valid PNG for testing."""
-    from conftest import _create_minimal_png
+    import struct, zlib
+    def _create_minimal_png():
+        sig = b'\x89PNG\r\n\x1a\n'
+        ihdr_data = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
+        ihdr_crc = zlib.crc32(b'IHDR' + ihdr_data) & 0xffffffff
+        ihdr = struct.pack('>I', 13) + b'IHDR' + ihdr_data + struct.pack('>I', ihdr_crc)
+        raw = b'\x00\xff\x00\x00'
+        compressed = zlib.compress(raw)
+        idat_crc = zlib.crc32(b'IDAT' + compressed) & 0xffffffff
+        idat = struct.pack('>I', len(compressed)) + b'IDAT' + compressed + struct.pack('>I', idat_crc)
+        iend_crc = zlib.crc32(b'IEND') & 0xffffffff
+        iend = struct.pack('>I', 0) + b'IEND' + struct.pack('>I', iend_crc)
+        return sig + ihdr + idat + iend
     return _create_minimal_png()
