@@ -712,3 +712,95 @@ class TestRetryAndTimeout:
         result = orch.run(pipeline)
         assert result.success
         assert result.outputs["combo"] == "recovered"
+
+
+# ── Middleware Hooks ─────────────────────────────────────────
+
+class TestMiddlewareHooks:
+    def test_before_step_hook(self):
+        """Pre-step hooks run before each step."""
+        log = []
+        orch = Orchestrator()
+        orch.before_step(lambda step, ctx: log.append(f"pre:{step.name}"))
+
+        pipeline = Pipeline("hook_test")
+        pipeline.add_step(PipelineStep(name="a", handler=lambda ctx: 1))
+        pipeline.add_step(PipelineStep(name="b", handler=lambda ctx: 2))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert log == ["pre:a", "pre:b"]
+
+    def test_after_step_hook(self):
+        """Post-step hooks run after each successful step."""
+        log = []
+        orch = Orchestrator()
+        orch.after_step(lambda step, ctx: log.append(f"post:{step.name}"))
+
+        pipeline = Pipeline("hook_test")
+        pipeline.add_step(PipelineStep(name="a", handler=lambda ctx: 1))
+        pipeline.add_step(PipelineStep(name="b", handler=lambda ctx: 2))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert log == ["post:a", "post:b"]
+
+    def test_before_hook_aborts_step(self):
+        """If a pre-hook raises, the step fails without executing."""
+        orch = Orchestrator()
+        orch.before_step(lambda step, ctx: (_ for _ in ()).throw(
+            ValueError("safety check failed")
+        ))
+
+        pipeline = Pipeline("abort_test")
+        pipeline.add_step(PipelineStep(name="blocked", handler=lambda ctx: "nope"))
+
+        result = orch.run(pipeline)
+        assert not result.success
+        assert "pre-hook" in result.steps[0][1].error
+        assert "safety check" in result.steps[0][1].error
+
+    def test_after_hook_aborts_pipeline(self):
+        """If a post-hook raises, the step is marked failed."""
+        orch = Orchestrator()
+        orch.after_step(lambda step, ctx: (_ for _ in ()).throw(
+            ValueError("validation failed")
+        ))
+
+        pipeline = Pipeline("post_abort")
+        pipeline.add_step(PipelineStep(name="ok", handler=lambda ctx: "done"))
+        pipeline.add_step(PipelineStep(name="never", handler=lambda ctx: "unreachable"))
+
+        result = orch.run(pipeline)
+        assert not result.success
+        assert len(result.steps) == 1
+        assert "post-hook" in result.steps[0][1].error
+
+    def test_multiple_hooks(self):
+        """Multiple hooks run in registration order."""
+        log = []
+        orch = Orchestrator()
+        orch.before_step(lambda step, ctx: log.append("first"))
+        orch.before_step(lambda step, ctx: log.append("second"))
+
+        pipeline = Pipeline("multi_hook")
+        pipeline.add_step(PipelineStep(name="s", handler=lambda ctx: 1))
+
+        orch.run(pipeline)
+        assert log == ["first", "second"]
+
+    def test_hooks_skipped_for_conditional(self):
+        """Hooks don't run for skipped steps."""
+        log = []
+        orch = Orchestrator()
+        orch.before_step(lambda step, ctx: log.append(step.name))
+
+        pipeline = Pipeline("skip_hook")
+        pipeline.add_step(PipelineStep(
+            name="skipped", handler=lambda ctx: 1,
+            condition=lambda ctx: False,
+        ))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert log == []  # hook never called

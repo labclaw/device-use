@@ -54,6 +54,9 @@ class Event:
 # Listener is any callable that accepts an Event
 EventListener = Callable[[Event], None]
 
+# Hook receives (step, context) and can raise to abort
+StepHook = Callable[["PipelineStep", dict[str, Any]], None]
+
 
 # ---------------------------------------------------------------------------
 # Tool Registry
@@ -395,6 +398,8 @@ class Orchestrator:
     def __init__(self, registry: ToolRegistry | None = None) -> None:
         self.registry = registry or ToolRegistry()
         self._listeners: list[EventListener] = []
+        self._pre_hooks: list[StepHook] = []
+        self._post_hooks: list[StepHook] = []
 
     # -- Event system --
 
@@ -402,6 +407,28 @@ class Orchestrator:
         """Register an event listener."""
         self._listeners.append(listener)
         self.registry.add_listener(listener)
+
+    # -- Middleware hooks --
+
+    def before_step(self, hook: StepHook) -> None:
+        """Register a hook that runs before each step.
+
+        The hook receives (step, context). If it raises, the step is
+        marked as failed and the pipeline stops.
+
+        Use cases: safety checks, parameter validation, logging.
+        """
+        self._pre_hooks.append(hook)
+
+    def after_step(self, hook: StepHook) -> None:
+        """Register a hook that runs after each successful step.
+
+        The hook receives (step, context). If it raises, the step is
+        marked as failed and the pipeline stops.
+
+        Use cases: data validation, audit logging, notifications.
+        """
+        self._post_hooks.append(hook)
 
     def _emit(self, event: Event) -> None:
         for listener in self._listeners:
@@ -525,13 +552,27 @@ class Orchestrator:
                 batches.append([step])
         return batches
 
+    def _run_hooks(self, hooks: list[StepHook], step: PipelineStep,
+                   context: dict[str, Any]) -> None:
+        """Run a list of hooks. Raises on first failure."""
+        for hook in hooks:
+            hook(step, context)
+
     def _run_single_step(
         self, step: PipelineStep, context: dict[str, Any], pipeline_name: str
     ) -> StepResult:
-        """Run one step, with optional retries and timeout."""
+        """Run one step, with optional hooks, retries, and timeout."""
         if step.condition is not None and not step.condition(context):
             logger.info("Skipped step: %s", step.name)
             return StepResult(status=StepStatus.SKIPPED)
+
+        # Pre-step hooks (safety checks, validation)
+        try:
+            self._run_hooks(self._pre_hooks, step, context)
+        except Exception as exc:
+            logger.error("Pre-hook failed for step %s: %s", step.name, exc)
+            return StepResult(status=StepStatus.FAILED,
+                              error=f"pre-hook: {exc}")
 
         self._emit(Event(
             event_type=EventType.STEP_START,
@@ -551,6 +592,17 @@ class Orchestrator:
             try:
                 output = self._execute_step_with_timeout(step, context)
                 duration_ms = (time.monotonic() - step_start) * 1000
+
+                # Post-step hooks (validation, audit)
+                try:
+                    self._run_hooks(self._post_hooks, step, context)
+                except Exception as exc:
+                    logger.error("Post-hook failed for step %s: %s",
+                                 step.name, exc)
+                    return StepResult(status=StepStatus.FAILED,
+                                      error=f"post-hook: {exc}",
+                                      duration_ms=duration_ms)
+
                 self._emit(Event(
                     event_type=EventType.STEP_END,
                     data={"pipeline": pipeline_name, "step": step.name,
