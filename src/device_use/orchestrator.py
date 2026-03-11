@@ -233,6 +233,31 @@ class PipelineResult:
                 return r.output
         return None
 
+    def summary(self) -> str:
+        """Render a visual summary of pipeline execution."""
+        status_icons = {
+            StepStatus.COMPLETED: "[OK]",
+            StepStatus.FAILED: "[FAIL]",
+            StepStatus.SKIPPED: "[SKIP]",
+            StepStatus.PENDING: "[..]",
+            StepStatus.RUNNING: "[>>]",
+        }
+        result_line = "OK" if self.success else "FAILED"
+
+        lines = [
+            f"Pipeline: {self.name}  ({result_line}, {self.duration_ms:.0f}ms)",
+            "",
+        ]
+
+        for i, (name, sr) in enumerate(self.steps):
+            icon = status_icons.get(sr.status, "[??]")
+            connector = "├──" if i < len(self.steps) - 1 else "└──"
+            time_str = f" {sr.duration_ms:.0f}ms" if sr.duration_ms else ""
+            error_str = f"  error: {sr.error}" if sr.error else ""
+            lines.append(f"  {connector} {icon} {name}{time_str}{error_str}")
+
+        return "\n".join(lines)
+
 
 class Pipeline:
     """A sequence of steps to execute.
@@ -267,6 +292,52 @@ class Pipeline:
 
     def __len__(self) -> int:
         return len(self.steps)
+
+    def describe(self) -> str:
+        """Render a visual plan of this pipeline before execution."""
+        lines = [f"Pipeline: {self.name} ({len(self.steps)} steps)"]
+        if self.description:
+            lines.append(f"  {self.description}")
+        lines.append("")
+
+        # Group into batches for parallel display
+        batches: list[list[PipelineStep]] = []
+        for step in self.steps:
+            if step.parallel and batches and batches[-1][0].parallel == step.parallel:
+                batches[-1].append(step)
+            else:
+                batches.append([step])
+
+        for bi, batch in enumerate(batches):
+            is_last_batch = bi == len(batches) - 1
+
+            if len(batch) > 1:
+                # Parallel group
+                lines.append(f"  {'├' if not is_last_batch else '└'}── parallel [{batch[0].parallel}]:")
+                prefix = "  │   " if not is_last_batch else "      "
+                for si, step in enumerate(batch):
+                    branch = "├" if si < len(batch) - 1 else "└"
+                    source = step.tool_name or "handler"
+                    extra = ""
+                    if step.retries:
+                        extra += f" retries={step.retries}"
+                    if step.timeout_s:
+                        extra += f" timeout={step.timeout_s}s"
+                    lines.append(f"{prefix}{branch}── {step.name} ({source}){extra}")
+            else:
+                step = batch[0]
+                connector = "├" if not is_last_batch else "└"
+                source = step.tool_name or "handler"
+                extra = ""
+                if step.retries:
+                    extra += f" retries={step.retries}"
+                if step.timeout_s:
+                    extra += f" timeout={step.timeout_s}s"
+                if step.condition:
+                    extra += " conditional"
+                lines.append(f"  {connector}── {step.name} ({source}){extra}")
+
+        return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------

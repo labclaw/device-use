@@ -143,6 +143,33 @@ class TestPipeline:
         assert result is p
         assert len(p) == 2
 
+    def test_describe(self):
+        p = Pipeline("my_pipeline")
+        p.add_step(PipelineStep(name="load", tool_name="topspin.process"))
+        p.add_step(PipelineStep(name="analyze", tool_name="brain.interpret"))
+        desc = p.describe()
+        assert "my_pipeline" in desc
+        assert "2 steps" in desc
+        assert "load" in desc
+        assert "analyze" in desc
+
+    def test_describe_parallel(self):
+        p = Pipeline("par_pipeline")
+        p.add_step(PipelineStep(name="a", handler=lambda ctx: 1, parallel="g"))
+        p.add_step(PipelineStep(name="b", handler=lambda ctx: 2, parallel="g"))
+        p.add_step(PipelineStep(name="c", handler=lambda ctx: 3))
+        desc = p.describe()
+        assert "parallel [g]" in desc
+        assert "a (handler)" in desc
+        assert "c (handler)" in desc
+
+    def test_describe_retry_timeout(self):
+        p = Pipeline("rt_pipeline")
+        p.add_step(PipelineStep(name="s", handler=lambda ctx: 1, retries=3, timeout_s=10))
+        desc = p.describe()
+        assert "retries=3" in desc
+        assert "timeout=10" in desc
+
 
 # ── Orchestrator ─────────────────────────────────────────────────
 
@@ -337,6 +364,35 @@ class TestOrchestrator:
         assert result.success
         assert result.outputs == {"a": 1, "b": 2, "c": 3}
         assert result.last_output == 3
+
+    def test_pipeline_result_summary(self):
+        orch = Orchestrator()
+
+        pipeline = Pipeline("summary_test")
+        pipeline.add_step(PipelineStep(name="ok", handler=lambda ctx: "done"))
+        pipeline.add_step(PipelineStep(
+            name="skip", handler=lambda ctx: None,
+            condition=lambda ctx: False,
+        ))
+
+        result = orch.run(pipeline)
+        summary = result.summary()
+        assert "summary_test" in summary
+        assert "[OK]" in summary
+        assert "[SKIP]" in summary
+        assert "ok" in summary
+
+    def test_pipeline_result_summary_failure(self):
+        orch = Orchestrator()
+
+        pipeline = Pipeline("fail_summary")
+        pipeline.add_step(PipelineStep(name="bad", handler=lambda ctx: 1 / 0))
+
+        result = orch.run(pipeline)
+        summary = result.summary()
+        assert "FAILED" in summary
+        assert "[FAIL]" in summary
+        assert "division by zero" in summary
 
 
 # ── Factory ──────────────────────────────────────────────────────
