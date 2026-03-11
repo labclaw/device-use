@@ -31,7 +31,7 @@ from device_use.instruments import ControlMode  # noqa: E402, I001
 from device_use.instruments.nmr.adapter import TopSpinAdapter  # noqa: E402
 from device_use.instruments.nmr.brain import NMRBrain  # noqa: E402
 from device_use.instruments.nmr.library import SpectralLibrary  # noqa: E402
-from device_use.instruments.nmr.processor import NMRProcessor, NMRSpectrum  # noqa: E402
+from device_use.instruments.nmr.processor import NMRSpectrum  # noqa: E402
 from device_use.instruments.nmr.visualizer import plot_spectrum  # noqa: E402
 from device_use.tools.pubchem import PubChemTool, PubChemError  # noqa: E402
 from lib.terminal import (  # noqa: E402
@@ -138,6 +138,16 @@ def _extract_peak_assignments(text: str) -> list[str]:
 # ── Grounding Verification ───────────────────────────────────────
 
 
+def _peak_mentioned_in_text(ppm: float, text: str, tolerance: float = 0.1) -> bool:
+    """Check whether a peak at *ppm* is mentioned (exactly or approximately) in *text*."""
+    if f"{ppm:.1f}" in text or f"{ppm:.2f}" in text:
+        return True
+    return any(
+        abs(float(m.group(1)) - ppm) <= tolerance
+        for m in re.finditer(r"(\d+\.\d+)", text)
+    )
+
+
 def calculate_peak_coverage(
     spectrum: NMRSpectrum, response_text: str, top_n: int = 10,
 ) -> float:
@@ -147,18 +157,10 @@ def calculate_peak_coverage(
     top_peaks = sorted(
         spectrum.peaks, key=lambda p: p.intensity, reverse=True,
     )[:top_n]
-    mentioned = 0
-    for peak in top_peaks:
-        if f"{peak.ppm:.1f}" in response_text or f"{peak.ppm:.2f}" in response_text:
-            mentioned += 1
-            continue
-        for m in re.finditer(r"(\d+\.\d+)\s*(?:ppm)?", response_text):
-            try:
-                if abs(float(m.group(1)) - peak.ppm) <= 0.1:
-                    mentioned += 1
-                    break
-            except ValueError:
-                continue
+    mentioned = sum(
+        1 for peak in top_peaks
+        if _peak_mentioned_in_text(peak.ppm, response_text)
+    )
     return mentioned / len(top_peaks)
 
 
@@ -199,16 +201,10 @@ def build_constraints(iteration: Iteration, spectrum: NMRSpectrum) -> str:
 
     top_peaks = sorted(spectrum.peaks, key=lambda p: p.intensity, reverse=True)[:10]
     raw = iteration.hypothesis.raw_analysis
-    unexplained = []
-    for peak in top_peaks:
-        if f"{peak.ppm:.2f}" in raw:
-            continue
-        if any(
-            abs(float(m.group(1)) - peak.ppm) <= 0.1
-            for m in re.finditer(r"(\d+\.\d+)", raw)
-        ):
-            continue
-        unexplained.append(f"{peak.ppm:.2f}")
+    unexplained = [
+        f"{peak.ppm:.2f}" for peak in top_peaks
+        if not _peak_mentioned_in_text(peak.ppm, raw)
+    ]
 
     name = iteration.hypothesis.compound_name
     issues_str = "; ".join(issues) if issues else "low overall grounding score"
@@ -242,7 +238,7 @@ def score_bar(score: float, width: int = 20) -> str:
 
 def generate_report(
     audit: AuditTrail, spectrum: NMRSpectrum,
-    processor: NMRProcessor, spectrum_image: str, output_path: Path,
+    spectrum_image: str, output_path: Path,
 ) -> Path:
     """Generate an IMRAD markdown report from the audit trail."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -446,7 +442,6 @@ def main() -> None:
     t0 = time.time()
     spectrum = adapter.process(dataset_path)
     done(time.time() - t0)
-    processor = NMRProcessor()
     ok(f"Peaks: {BOLD}{len(spectrum.peaks)}{RESET} | "
        f"{spectrum.frequency_mhz:.0f} MHz | {spectrum.solvent}")
 
@@ -497,7 +492,7 @@ def main() -> None:
         else:
             warn("No library matches found")
         audit.total_time = time.time() - t_start
-        rp = generate_report(audit, spectrum, processor, spectrum_image, output_dir)
+        rp = generate_report(audit, spectrum, spectrum_image, output_dir)
         ok(f"Report: {BOLD}{rp}{RESET}")
         finale([
             "Library matching only (--no-brain)",
@@ -623,7 +618,7 @@ def main() -> None:
     audit.total_time = time.time() - t_start
     phase(5, "REPORT", "Generate IMRAD report with full audit trail")
     report_path = generate_report(
-        audit, spectrum, processor, spectrum_image, output_dir,
+        audit, spectrum, spectrum_image, output_dir,
     )
     ok(f"Report saved: {BOLD}{report_path}{RESET}")
 

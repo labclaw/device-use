@@ -220,10 +220,8 @@ class TestBuildConstraints:
 
 class TestGenerateReport:
     def _report(self, audit, spectrum, tmp_path):
-        from device_use.instruments.nmr.processor import NMRProcessor
-        proc = NMRProcessor()
         report_path = generate_report(
-            audit, spectrum, proc, str(tmp_path / "spectrum.png"), tmp_path,
+            audit, spectrum, str(tmp_path / "spectrum.png"), tmp_path,
         )
         return report_path.read_text()
 
