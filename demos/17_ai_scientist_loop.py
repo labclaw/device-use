@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import re
 import sys
@@ -20,6 +21,8 @@ import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=UserWarning, module="nmrglue")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy")
@@ -118,7 +121,10 @@ def _extract_confidence(text: str) -> str:
         r"confidence[:\s]*\*{0,2}(high|medium|low)\*{0,2}",
         text, re.IGNORECASE,
     )
-    return m.group(1).capitalize() if m else "Medium"
+    if m:
+        return m.group(1).capitalize()
+    logger.debug("Could not parse confidence level from AI response")
+    return "Unknown"
 
 
 def _extract_peak_assignments(text: str) -> list[str]:
@@ -179,12 +185,16 @@ def verify_with_pubchem(
     compound_name: str, expected_formula: str,
 ) -> tuple[dict | None, bool]:
     """PubChem lookup + formula match check. Returns (data, matches)."""
+    if not compound_name or compound_name == "Unknown":
+        logger.warning("Skipping PubChem: no valid compound name to look up")
+        return None, False
     try:
         data = PubChemTool().lookup_by_name(compound_name)
         pc = re.sub(r"\s+", "", data.get("MolecularFormula", ""))
         expected = re.sub(r"\s+", "", expected_formula)
         return data, pc == expected
-    except PubChemError:
+    except PubChemError as exc:
+        logger.warning("PubChem lookup failed for '%s': %s", compound_name, exc)
         return None, False
 
 
@@ -247,6 +257,8 @@ def generate_report(
     last = audit.iterations[-1] if audit.iterations else None
     status = "ACCEPTED" if audit.accepted else "INCONCLUSIVE"
     max_int = max(p.intensity for p in spectrum.peaks) if spectrum.peaks else 1.0
+    if max_int == 0.0:
+        max_int = 1.0
 
     sections = [
         "# AI Scientist Report\n",
@@ -441,13 +453,20 @@ def main() -> None:
 
     progress("Processing FID -> Spectrum...")
     t0 = time.time()
-    spectrum = adapter.process(dataset_path)
+    try:
+        spectrum = adapter.process(dataset_path)
+    except Exception as exc:
+        print()
+        err(f"Failed to process dataset: {exc}")
+        sys.exit(1)
     done(time.time() - t0)
     ok(f"Peaks: {BOLD}{len(spectrum.peaks)}{RESET} | "
        f"{spectrum.frequency_mhz:.0f} MHz | {spectrum.solvent}")
 
     section("Top Peaks")
     max_int = max(p.intensity for p in spectrum.peaks) if spectrum.peaks else 1.0
+    if max_int == 0.0:
+        max_int = 1.0
     for peak in sorted(spectrum.peaks, key=lambda p: p.intensity, reverse=True)[:8]:
         rel = peak.intensity / max_int * 100
         print(f"    d {peak.ppm:7.3f} ppm  {rel:5.1f}%  {DIM}{'█' * int(rel / 5)}{RESET}")
@@ -530,16 +549,26 @@ def main() -> None:
         print(f"  {CYAN}{'─' * 56}{RESET}")
         t0 = time.time()
         response_text = ""
-        for chunk in brain.interpret_spectrum(
-            spectrum, molecular_formula=args.formula,
-            context=context.strip(), stream=True,
-        ):
-            sys.stdout.write(chunk)
-            sys.stdout.flush()
-            response_text += chunk
+        try:
+            for chunk in brain.interpret_spectrum(
+                spectrum, molecular_formula=args.formula,
+                context=context.strip(), stream=True,
+            ):
+                sys.stdout.write(chunk)
+                sys.stdout.flush()
+                response_text += chunk
+        except Exception as exc:
+            logger.error("AI streaming failed: %s", exc)
+            print()
+            err(f"AI analysis failed: {exc}")
+            sys.exit(1)
         dt = time.time() - t0
         print(f"\n  {CYAN}{'─' * 56}{RESET}")
         info(f"  Analysis complete ({dt:.1f}s)")
+
+        if not response_text.strip():
+            err("AI returned empty response — cannot form hypothesis")
+            sys.exit(1)
 
         hypothesis = parse_hypothesis(response_text)
         print()
