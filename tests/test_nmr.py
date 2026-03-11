@@ -217,3 +217,120 @@ class TestNMRBrain:
                 result = brain.interpret_spectrum(spectrum, stream=False)
                 assert isinstance(result, str)
                 assert len(result) > 100  # Should have substantial content
+
+
+# ── SpectralLibrary ──────────────────────────────────────────────
+
+class TestSpectralLibrary:
+    def test_add_and_list(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary()
+        lib.add("ethanol", [1.2, 3.7, 4.8])
+        lib.add("acetone", [2.1])
+        assert len(lib) == 2
+        assert lib.list_entries() == ["ethanol", "acetone"]
+
+    def test_exact_match(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary()
+        lib.add("ethanol", [1.2, 3.7])
+        lib.add("acetone", [2.1])
+        lib.add("dmso", [2.5])
+
+        matches = lib.match_peaks([1.2, 3.7])
+        assert matches[0].entry.name == "ethanol"
+        assert matches[0].score == 1.0
+
+    def test_partial_match(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary()
+        lib.add("ethanol", [1.2, 3.7, 4.8])
+
+        # Query with 2 of 3 peaks
+        matches = lib.match_peaks([1.2, 3.7])
+        assert matches[0].entry.name == "ethanol"
+        assert matches[0].score > 0.5  # 2 matched out of 3 union
+        assert matches[0].matched_peaks == 2
+
+    def test_tolerance(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary(tolerance_ppm=0.1)
+        lib.add("ethanol", [1.20])
+
+        # Within tolerance
+        matches = lib.match_peaks([1.25])
+        assert matches[0].score == 1.0
+
+        # Outside tolerance
+        lib2 = SpectralLibrary(tolerance_ppm=0.01)
+        lib2.add("ethanol", [1.20])
+        matches2 = lib2.match_peaks([1.25])
+        assert matches2[0].score == 0.0
+
+    def test_no_entries(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary()
+        matches = lib.match_peaks([1.2, 3.7])
+        assert matches == []
+
+    def test_empty_peaks(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary()
+        lib.add("ethanol", [1.2, 3.7])
+        matches = lib.match_peaks([])
+        assert matches[0].score == 0.0
+
+    def test_add_spectrum(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary()
+        spectrum = NMRSpectrum(
+            data=np.array([1.0]),
+            ppm_scale=np.array([1.0]),
+            peaks=[NMRPeak(ppm=7.26, intensity=100)],
+            title="chloroform",
+        )
+        lib.add_spectrum(spectrum)
+        assert lib.list_entries() == ["chloroform"]
+
+    def test_match_spectrum(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary()
+        lib.add("chloroform", [7.26])
+        lib.add("tms", [0.0])
+
+        query = NMRSpectrum(
+            data=np.array([1.0]),
+            ppm_scale=np.array([1.0]),
+            peaks=[NMRPeak(ppm=7.26, intensity=100)],
+        )
+        matches = lib.match(query)
+        assert matches[0].entry.name == "chloroform"
+        assert matches[0].score == 1.0
+
+    def test_from_examdata(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+        from pathlib import Path
+
+        lib = SpectralLibrary.from_examdata()
+        if Path("/opt/topspin5.0.0/examdata").exists():
+            assert len(lib) > 0
+        else:
+            assert len(lib) == 0  # graceful fallback
+
+    def test_top_k(self):
+        from device_use.instruments.nmr.library import SpectralLibrary
+
+        lib = SpectralLibrary()
+        for i in range(10):
+            lib.add(f"compound_{i}", [float(i)])
+
+        matches = lib.match_peaks([0.0], top_k=3)
+        assert len(matches) == 3
