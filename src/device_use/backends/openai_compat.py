@@ -9,10 +9,21 @@ import logging
 import re
 from typing import Any
 
+from dataclasses import dataclass
+
 import backoff
 from openai import AsyncOpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _CUStepResult:
+    """Result of a single computer use step, avoiding mutation of SDK response."""
+
+    response: Any
+    has_safety_checks: bool
+
 
 # Models that support native computer use via Responses API
 _COMPUTER_USE_MODELS = frozenset({
@@ -70,7 +81,7 @@ class OpenAICompatBackend:
         screenshot: bytes,
         task: str,
         call_id: str | None = None,
-    ) -> Any:
+    ) -> _CUStepResult:
         """Execute one step of the GPT-5.4 computer use loop.
 
         First call: send task as input text + initial screenshot.
@@ -130,15 +141,16 @@ class OpenAICompatBackend:
         self._previous_response_id = response.id
 
         # Check for pending safety checks on computer_call items
+        has_safety_checks = False
         for item in getattr(response, "output", []):
             if getattr(item, "type", None) == "computer_call":
                 checks = getattr(item, "pending_safety_checks", [])
                 if checks:
                     logger.warning("CU pending safety checks: %s", checks)
-                    response._has_safety_checks = True
+                    has_safety_checks = True
                     break
 
-        return response
+        return _CUStepResult(response=response, has_safety_checks=has_safety_checks)
 
     def _extract_computer_calls(
         self, response: Any
@@ -216,16 +228,16 @@ class OpenAICompatBackend:
 
         for turn in range(max_turns):
             screenshot = await take_screenshot()
-            response = await self._computer_use_step(screenshot, task, call_id)
+            step_result = await self._computer_use_step(screenshot, task, call_id)
 
             # Handle pending safety checks — abort loop
-            if getattr(response, "_has_safety_checks", False):
+            if step_result.has_safety_checks:
                 logger.warning(
                     "CU loop aborting at turn %d due to pending_safety_checks", turn
                 )
                 break
 
-            cu_actions = self._extract_computer_calls(response)
+            cu_actions = self._extract_computer_calls(step_result.response)
             if not cu_actions:
                 # No more computer_call items — model considers task done
                 logger.info("CU loop completed at turn %d (no actions)", turn)
@@ -376,10 +388,10 @@ class OpenAICompatBackend:
             last = history[-1] if history else {}
             call_id = last.get("call_id")
 
-        response = await self._computer_use_step(screenshot, full_task, call_id)
+        step_result = await self._computer_use_step(screenshot, full_task, call_id)
 
         # Extract computer_call actions
-        cu_actions = self._extract_computer_calls(response)
+        cu_actions = self._extract_computer_calls(step_result.response)
         if cu_actions:
             # Return the first action (agent loop handles one at a time)
             mapped = self._map_cu_action(cu_actions[0])
@@ -391,7 +403,7 @@ class OpenAICompatBackend:
             return mapped
 
         # No computer_call — model is done or gave text response
-        text = self._extract_text(response)
+        text = self._extract_text(step_result.response)
         return {
             "reasoning": text or "Task completed",
             "action": {"action_type": "wait", "seconds": 0},

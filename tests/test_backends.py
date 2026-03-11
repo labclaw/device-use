@@ -608,8 +608,8 @@ class TestPendingSafetyChecks:
         )
         cu_backend._responses_create = AsyncMock(return_value=mock_resp)
 
-        response = await cu_backend._computer_use_step(b"png", "task")
-        assert getattr(response, "_has_safety_checks", False) is True
+        result = await cu_backend._computer_use_step(b"png", "task")
+        assert result.has_safety_checks is True
 
     @pytest.mark.asyncio
     async def test_no_safety_checks_clean(self, cu_backend):
@@ -619,8 +619,8 @@ class TestPendingSafetyChecks:
         )
         cu_backend._responses_create = AsyncMock(return_value=mock_resp)
 
-        response = await cu_backend._computer_use_step(b"png", "task")
-        assert getattr(response, "_has_safety_checks", False) is False
+        result = await cu_backend._computer_use_step(b"png", "task")
+        assert result.has_safety_checks is False
 
     @pytest.mark.asyncio
     async def test_cu_loop_aborts_on_safety_checks(self, cu_backend):
