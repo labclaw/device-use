@@ -433,8 +433,8 @@ class OpenAICompatBackend:
             action["action_type"] = "hotkey"
             action["keys"] = cu.get("keys", [])
         elif action_type == "scroll":
-            action["coordinates"] = [cu.get("x", 0), cu.get("y", 0)]
-            scroll_y = cu.get("scroll_y", 0)
+            action["coordinates"] = [cu.get("x") or 0, cu.get("y") or 0]
+            scroll_y = cu.get("scroll_y") or 0
             # Map scroll_y to clicks: negative scroll_y = scroll down = negative clicks,
             # positive scroll_y = scroll up = positive clicks.
             # GPT-5.4 uses pixel deltas; convert to discrete clicks (120px per click).
