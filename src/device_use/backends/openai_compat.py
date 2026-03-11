@@ -408,11 +408,14 @@ class OpenAICompatBackend:
 
         if action_type in ("click", "double_click", "right_click"):
             action["coordinates"] = [cu["x"], cu["y"]]
-            if action_type == "right_click":
+            button = cu.get("button", "left")
+            if action_type == "right_click" or button == "right":
                 action["action_type"] = "click"
                 action["button"] = "right"
             elif action_type == "double_click":
                 action["action_type"] = "double_click"
+            elif button and button != "left":
+                action["button"] = button
         elif action_type == "type":
             action["text"] = cu.get("text", "")
         elif action_type == "keypress":
