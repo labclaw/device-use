@@ -36,7 +36,10 @@ src/device_use/
       brain.py             # PlateReaderBrain (Claude API + cache fallback)
       visualizer.py        # 96-well heatmap plots
     template.py            # Copy-and-implement guide for new instruments
-  orchestrator.py          # Pipeline + ToolRegistry + Events
+  orchestrator.py          # Pipeline + ToolRegistry + Events + Retry/Timeout
+  integrations/
+    labclaw.py             # LabClaw Layer 1 adapter
+    mcp_server.py          # MCP server — Claude Code instrument integration
   cli.py                   # CLI: instruments, status, demo, run, interactive
   tools/
     base.py                # BaseTool ABC
@@ -62,7 +65,8 @@ demos/
 tests/
   test_nmr.py              # NMR module tests
   test_plate_reader.py     # Plate reader + brain tests (22 tests)
-  test_orchestrator.py     # Pipeline + registry + factory tests (27 tests)
+  test_orchestrator.py     # Pipeline + registry + parallel + retry tests (37 tests)
+  test_mcp_server.py       # MCP server integration tests (12 tests)
   test_tools.py            # External tool tests
   test_web.py              # Web API endpoint tests (16 tests)
   test_integration.py      # Cross-instrument pipeline tests (11 tests)
@@ -74,7 +78,7 @@ tests/
 - **TopSpin 5.0.0** examdata at `/opt/topspin5.0.0/examdata/`
 - Install: `pip install -e ".[nmr,dev]"`
 - Run demos: `python demos/<script>.py` or `python -m device_use demo`
-- Run tests: `python -m pytest tests/` (307 tests)
+- Run tests: `python -m pytest tests/` (329 tests)
 - CLI: `python -m device_use status` / `instruments` / `demo`
 - Web GUI: `./demos/run_web.sh` (port 8420)
 
@@ -86,6 +90,9 @@ tests/
 - **Three control modes**: Same instrument, same output, different control paths
 - **Streaming**: Brain responses stream via generators (CLI) or SSE (web)
 - **Event-driven**: All orchestrator actions emit events for monitoring/audit
+- **Retry + timeout**: `PipelineStep(retries=2, timeout_s=10)` for flaky instruments
+- **Parallel steps**: `PipelineStep(parallel="group1")` for concurrent execution
+- **MCP server**: `python -m device_use.integrations.mcp_server` for Claude Code
 
 ## Git
 
