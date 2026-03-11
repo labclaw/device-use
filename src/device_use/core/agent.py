@@ -6,6 +6,7 @@ and action execution into a coherent agent loop.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -161,6 +162,20 @@ class DeviceAgent:
 
                 result = self._executor.execute(action)
                 all_actions.append(result)
+
+                # Execute remaining batched actions (GPT-5.4 can return multiple)
+                remaining = plan.get("_remaining_actions", [])
+                for extra_plan in remaining:
+                    extra_data = extra_plan.get("action", {})
+                    try:
+                        extra_action = parse_action(extra_data)
+                    except (ValueError, KeyError, TypeError) as e:
+                        logger.warning("Skipping invalid batched action: %s", e)
+                        continue
+                    # 120ms inter-action delay (OpenAI CUA reference pattern)
+                    await asyncio.sleep(0.12)
+                    extra_result = self._executor.execute(extra_action)
+                    all_actions.append(extra_result)
 
                 # VERIFY
                 verify_screenshot = await self._capture_screenshot()
