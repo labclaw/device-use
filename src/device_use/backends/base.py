@@ -17,7 +17,7 @@ class VisionBackend(Protocol):
     def supports_grounding(self) -> bool:
         """Whether this backend can output pixel coordinates directly.
 
-        True for: Claude Computer Use, UI-TARS
+        True for: Claude Computer Use, GPT-5.4 Computer Use, UI-TARS
         False for: GPT-4o (needs OmniParser or SoM overlay)
         """
         ...
