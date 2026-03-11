@@ -110,6 +110,15 @@ def main():
     except Exception as e:
         print(f"    PubChem lookup skipped: {e}")
 
+    # ── AI analysis of plate reader data ─────────────────────────
+    print("\n  Running plate reader AI analysis...")
+    from device_use.instruments.plate_reader.brain import PlateReaderBrain
+    plate_brain = PlateReaderBrain()
+    elisa_analysis = plate_brain.interpret_reading(elisa, stream=False)
+    viability_analysis = plate_brain.interpret_reading(viability, stream=False)
+    print(f"    ELISA interpretation: {len(elisa_analysis)} chars")
+    print(f"    Viability interpretation: {len(viability_analysis)} chars")
+
     # ── Plate reader statistics ─────────────────────────────────
     import statistics
 
@@ -210,6 +219,10 @@ def main():
 
 ![ELISA Heatmap](report_elisa.png)
 
+### AI Interpretation (ELISA)
+
+{elisa_analysis}
+
 ### 2.2 Cell Viability (Calcein AM)
 
 **Protocol:** {viability.protocol}
@@ -223,6 +236,10 @@ def main():
 | Assay quality | {'Excellent' if z_factor > 0.5 else 'Acceptable' if z_factor > 0 else 'Poor'} |
 
 ![Viability Heatmap](report_viability.png)
+
+### AI Interpretation (Cell Viability)
+
+{viability_analysis}
 
 ---
 

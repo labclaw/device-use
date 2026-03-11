@@ -202,3 +202,54 @@ class TestPlateReaderOrchestration:
         tool_names = [t.name for t in tools]
         assert "topspin.list_datasets" in tool_names
         assert "platereader.list_datasets" in tool_names
+
+
+# ── Brain (AI interpretation) ──────────────────────────────────────
+
+class TestPlateReaderBrain:
+    def test_interpret_elisa_cached(self):
+        from device_use.instruments.plate_reader.brain import PlateReaderBrain
+
+        adapter = PlateReaderAdapter(mode=ControlMode.OFFLINE)
+        reading = adapter.process("ELISA")
+        brain = PlateReaderBrain()
+
+        analysis = brain.interpret_reading(reading, stream=False)
+        assert isinstance(analysis, str)
+        assert len(analysis) > 100
+        assert "ELISA" in analysis
+
+    def test_interpret_viability_cached(self):
+        from device_use.instruments.plate_reader.brain import PlateReaderBrain
+
+        adapter = PlateReaderAdapter(mode=ControlMode.OFFLINE)
+        reading = adapter.process("CellViability")
+        brain = PlateReaderBrain()
+
+        analysis = brain.interpret_reading(reading, stream=False)
+        assert isinstance(analysis, str)
+        assert "Viability" in analysis or "viability" in analysis
+
+    def test_interpret_streaming(self):
+        from device_use.instruments.plate_reader.brain import PlateReaderBrain
+
+        adapter = PlateReaderAdapter(mode=ControlMode.OFFLINE)
+        reading = adapter.process("ELISA")
+        brain = PlateReaderBrain()
+
+        chunks = list(brain.interpret_reading(reading, stream=True))
+        assert len(chunks) > 0
+        full_text = "".join(chunks)
+        assert "ELISA" in full_text
+
+    def test_build_summary(self):
+        from device_use.instruments.plate_reader.brain import PlateReaderBrain
+
+        adapter = PlateReaderAdapter(mode=ControlMode.OFFLINE)
+        reading = adapter.process("ELISA")
+        brain = PlateReaderBrain()
+
+        summary = brain._build_summary(reading)
+        assert "Protocol:" in summary
+        assert "Wavelength:" in summary
+        assert "Signal/Noise:" in summary
