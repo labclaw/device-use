@@ -320,7 +320,8 @@ class TestAccessibilityOperatorMenus:
 
     def test_click_menu_empty_path(self):
         op, cf, ax = _create_operator_with_mocks()
-        assert op.click_menu() is False
+        with pytest.raises(ValueError, match="at least one menu path component"):
+            op.click_menu()
 
 
 class TestAccessibilityOperatorToolbar:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
 
@@ -45,24 +46,15 @@ class BaseOperator(ABC):
         """Wait until the application is ready for the next command."""
 
 
+@dataclass(slots=True)
 class OperatorResult:
     """Result of an operator action."""
 
-    __slots__ = ("success", "layer_used", "output", "error", "duration_s")
-
-    def __init__(
-        self,
-        success: bool,
-        layer_used: ControlLayer,
-        output: str = "",
-        error: str = "",
-        duration_s: float = 0.0,
-    ):
-        self.success = success
-        self.layer_used = layer_used
-        self.output = output
-        self.error = error
-        self.duration_s = duration_s
+    success: bool
+    layer_used: ControlLayer
+    output: str = ""
+    error: str = ""
+    duration_s: float = 0.0
 
     def __repr__(self) -> str:
         status = "OK" if self.success else "FAIL"

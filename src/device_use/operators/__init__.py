@@ -12,6 +12,6 @@ the fastest available layer first, falling back as needed.
 from __future__ import annotations
 
 from device_use.operators.a11y import AccessibilityOperator
-from device_use.operators.base import BaseOperator, ControlLayer
+from device_use.operators.base import BaseOperator, ControlLayer, OperatorResult
 
-__all__ = ["BaseOperator", "ControlLayer", "AccessibilityOperator"]
+__all__ = ["BaseOperator", "ControlLayer", "AccessibilityOperator", "OperatorResult"]

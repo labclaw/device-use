@@ -102,8 +102,9 @@ class SkillContext:
 
         profile_path = self.device_dir / "profile.yaml"
         if profile_path.exists():
-            with open(profile_path) as f:
-                self.profile: dict | None = yaml.safe_load(f)
+            self.profile: dict | None = yaml.safe_load(
+                profile_path.read_text(encoding="utf-8")
+            )
         else:
             self.profile = None
             logger.debug("No profile.yaml for %s", device_name)

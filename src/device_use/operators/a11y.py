@@ -246,6 +246,8 @@ class AccessibilityOperator(BaseOperator):
 
     def click_menu(self, *path: str) -> bool:
         """Click a menu item by path. E.g. click_menu("Processing", "Fourier Transform [ft]")."""
+        if not path:
+            raise ValueError("click_menu() requires at least one menu path component")
         err, menubar = self._get_attr(self._app, "AXMenuBar")
         if err != 0 or not menubar:
             return False
