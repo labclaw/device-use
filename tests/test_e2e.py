@@ -6,10 +6,8 @@ No real instruments, API keys, or display required.
 
 from __future__ import annotations
 
-import struct
 import subprocess
 import sys
-import zlib
 from unittest.mock import patch
 
 import pytest
@@ -24,28 +22,9 @@ from device_use.core.result import AgentResult
 # ---------------------------------------------------------------------------
 
 
-def _minimal_png() -> bytes:
-    """Create a 1x1 red pixel PNG for mock screenshots."""
-    sig = b"\x89PNG\r\n\x1a\n"
-    ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
-    ihdr_crc = zlib.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF
-    ihdr = struct.pack(">I", 13) + b"IHDR" + ihdr_data + struct.pack(">I", ihdr_crc)
-    raw = b"\x00\xff\x00\x00"
-    compressed = zlib.compress(raw)
-    idat_crc = zlib.crc32(b"IDAT" + compressed) & 0xFFFFFFFF
-    idat = (
-        struct.pack(">I", len(compressed))
-        + b"IDAT"
-        + compressed
-        + struct.pack(">I", idat_crc)
-    )
-    iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
-    iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
-    return sig + ihdr + idat + iend
-
-
 async def _mock_capture() -> bytes:
-    return _minimal_png()
+    from conftest import _create_minimal_png
+    return _create_minimal_png()
 
 
 class MockBackend:

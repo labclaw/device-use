@@ -334,25 +334,9 @@ class TestDeviceAgent:
         assert result.success is True  # Eventually completes after skipping bad action
 
 
-# Helper
+# Helper — uses _create_minimal_png from conftest
 
 async def _mock_capture() -> bytes:
     """Return a minimal valid PNG for testing."""
-    # 1x1 red pixel PNG
-    import struct, zlib
-    def _create_minimal_png():
-        sig = b'\x89PNG\r\n\x1a\n'
-        # IHDR
-        ihdr_data = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
-        ihdr_crc = zlib.crc32(b'IHDR' + ihdr_data) & 0xffffffff
-        ihdr = struct.pack('>I', 13) + b'IHDR' + ihdr_data + struct.pack('>I', ihdr_crc)
-        # IDAT
-        raw = b'\x00\xff\x00\x00'  # filter byte + RGB
-        compressed = zlib.compress(raw)
-        idat_crc = zlib.crc32(b'IDAT' + compressed) & 0xffffffff
-        idat = struct.pack('>I', len(compressed)) + b'IDAT' + compressed + struct.pack('>I', idat_crc)
-        # IEND
-        iend_crc = zlib.crc32(b'IEND') & 0xffffffff
-        iend = struct.pack('>I', 0) + b'IEND' + struct.pack('>I', iend_crc)
-        return sig + ihdr + idat + iend
+    from conftest import _create_minimal_png
     return _create_minimal_png()
