@@ -57,6 +57,7 @@ demos/
   multi_instrument_demo.py      # NMR + Plate Reader together
   lab_report_demo.py            # Raw data → paper-ready report
   streaming_demo.py             # Real-time event stream
+  topspin_reaction_monitor.py   # Autonomous reaction monitoring
 
 tests/
   test_nmr.py              # NMR module tests
@@ -73,7 +74,7 @@ tests/
 - **TopSpin 5.0.0** examdata at `/opt/topspin5.0.0/examdata/`
 - Install: `pip install -e ".[nmr,dev]"`
 - Run demos: `python demos/<script>.py` or `python -m device_use demo`
-- Run tests: `python -m pytest tests/ -m "not network"` (307 tests)
+- Run tests: `python -m pytest tests/` (307 tests)
 - CLI: `python -m device_use status` / `instruments` / `demo`
 - Web GUI: `./demos/run_web.sh` (port 8420)
 
