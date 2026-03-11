@@ -72,6 +72,17 @@ def main():
         help="Demo to run (default: multi)",
     )
 
+    # scaffold — generate a new device package
+    scaffold_parser = subparsers.add_parser(
+        "scaffold", help="Generate a new device package (collection)"
+    )
+    scaffold_parser.add_argument(
+        "device_name", help="Device name (e.g. 'zeiss-zen', 'flowjo')"
+    )
+    scaffold_parser.add_argument(
+        "--output", "-o", default=".", help="Output directory (default: current)"
+    )
+
     args = parser.parse_args()
 
     if args.command == "list-profiles":
@@ -86,6 +97,8 @@ def main():
         _status()
     elif args.command == "demo":
         _demo(args.name)
+    elif args.command == "scaffold":
+        _scaffold(args.device_name, args.output)
     else:
         _hero()
 
@@ -247,6 +260,253 @@ def _demo(name: str):
     }
     script = demo_map[name]
     subprocess.run([sys.executable, script])
+
+
+def _scaffold(device_name: str, output_dir: str):
+    """Generate a new device package (collection) with standard structure."""
+    import os
+
+    slug = device_name.lower().replace("-", "_").replace(" ", "_")
+    pkg_name = f"device_use_{slug}"
+    class_name = "".join(w.capitalize() for w in device_name.replace("-", " ").replace("_", " ").split())
+    root = os.path.join(output_dir, pkg_name)
+
+    if os.path.exists(root):
+        print(f"Error: {root} already exists")
+        return
+
+    dirs = [
+        f"{root}/src/{pkg_name}",
+        f"{root}/skills",
+        f"{root}/mcp",
+        f"{root}/docs",
+        f"{root}/examples",
+        f"{root}/tests",
+    ]
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+
+    # pyproject.toml
+    _write(f"{root}/pyproject.toml", f'''[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "{pkg_name}"
+version = "0.1.0"
+description = "device-use adapter for {device_name}"
+requires-python = ">=3.11"
+dependencies = ["device-use"]
+
+[project.entry-points."device_use.instruments"]
+{slug} = "{pkg_name}:create_adapter"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{pkg_name}"]
+''')
+
+    # Main __init__.py with adapter factory
+    _write(f"{root}/src/{pkg_name}/__init__.py", f'''"""device-use adapter for {device_name}."""
+
+from {pkg_name}.adapter import {class_name}Adapter
+
+
+def create_adapter(control_mode):
+    """Entry point for device-use plugin discovery."""
+    return {class_name}Adapter(mode=control_mode)
+
+
+__all__ = ["{class_name}Adapter", "create_adapter"]
+''')
+
+    # Adapter skeleton
+    _write(f"{root}/src/{pkg_name}/adapter.py", f'''"""Adapter for {device_name} — implements BaseInstrument."""
+
+from __future__ import annotations
+
+from device_use.instruments.base import BaseInstrument, ControlMode, InstrumentInfo
+
+
+class {class_name}Adapter(BaseInstrument):
+    """Control {device_name} through the device-use middleware.
+
+    Supports three control modes:
+      - OFFLINE: Process local data files
+      - API: Connect via instrument API/SDK
+      - GUI: Visual automation via Computer Use
+    """
+
+    def __init__(self, mode: ControlMode = ControlMode.OFFLINE):
+        self._mode = mode
+        self._connected = False
+
+    def info(self) -> InstrumentInfo:
+        return InstrumentInfo(
+            name="{class_name}",
+            vendor="TODO",
+            instrument_type="{slug}",
+            supported_modes=[ControlMode.OFFLINE, ControlMode.API, ControlMode.GUI],
+            version="0.1.0",
+        )
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    @property
+    def mode(self) -> ControlMode:
+        return self._mode
+
+    def connect(self) -> bool:
+        # TODO: Implement connection logic
+        self._connected = True
+        return True
+
+    def list_datasets(self):
+        # TODO: Return available datasets
+        return []
+
+    def acquire(self, **kwargs):
+        # TODO: Acquire data from instrument
+        raise NotImplementedError("Acquisition not yet implemented")
+
+    def process(self, data_path, **kwargs):
+        # TODO: Process raw data
+        raise NotImplementedError("Processing not yet implemented")
+''')
+
+    # MCP server
+    _write(f"{root}/mcp/server.py", f'''"""MCP server for {device_name} — Claude Code integration."""
+
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("{slug}")
+
+
+@mcp.tool()
+def list_datasets() -> str:
+    """List available {device_name} datasets."""
+    from {pkg_name} import create_adapter
+    from device_use.instruments.base import ControlMode
+    import json
+    adapter = create_adapter(ControlMode.OFFLINE)
+    adapter.connect()
+    return json.dumps(adapter.list_datasets(), indent=2, default=str)
+
+
+if __name__ == "__main__":
+    mcp.run()
+''')
+
+    # Example script
+    _write(f"{root}/examples/quickstart.py", f'''"""Quick start — process data with {device_name}."""
+
+from device_use import create_orchestrator
+
+
+def main():
+    orch = create_orchestrator()
+    instruments = orch.registry.list_instruments()
+    print(f"Instruments: {{len(instruments)}}")
+    for info in instruments:
+        print(f"  {{info.name}} ({{info.instrument_type}})")
+
+
+if __name__ == "__main__":
+    main()
+''')
+
+    # Test skeleton
+    _write(f"{root}/tests/test_adapter.py", f'''"""Tests for {class_name}Adapter."""
+
+from {pkg_name} import {class_name}Adapter, create_adapter
+from device_use.instruments.base import ControlMode
+
+
+class Test{class_name}Adapter:
+    def test_info(self):
+        adapter = {class_name}Adapter()
+        info = adapter.info()
+        assert info.name == "{class_name}"
+        assert info.instrument_type == "{slug}"
+
+    def test_connect(self):
+        adapter = {class_name}Adapter()
+        assert adapter.connect() is True
+        assert adapter.connected is True
+
+    def test_create_adapter_factory(self):
+        adapter = create_adapter(ControlMode.OFFLINE)
+        assert adapter.mode == ControlMode.OFFLINE
+''')
+
+    # README
+    _write(f"{root}/README.md", f'''# {pkg_name}
+
+device-use adapter for **{device_name}**.
+
+## Install
+
+```bash
+pip install -e .
+```
+
+Once installed, `create_orchestrator()` auto-discovers this instrument via entry points.
+
+## Usage
+
+```python
+from device_use import create_orchestrator
+
+orch = create_orchestrator()
+# {class_name} is now available as a registered instrument
+```
+
+## Structure
+
+```
+{pkg_name}/
+├── src/{pkg_name}/
+│   ├── __init__.py       # Entry point + create_adapter()
+│   └── adapter.py        # {class_name}Adapter (BaseInstrument)
+├── skills/                # Claude Code skills
+├── mcp/
+│   └── server.py          # MCP server for Claude Code
+├── docs/                  # Documentation
+├── examples/
+│   └── quickstart.py      # Quick start demo
+└── tests/
+    └── test_adapter.py    # Adapter tests
+```
+''')
+
+    # Skills placeholder
+    _write(f"{root}/skills/README.md", f'''# Skills for {device_name}
+
+Place Claude Code skills (`.md` files) here.
+
+Skills are loaded by Claude Code to provide domain-specific knowledge
+about operating {device_name}.
+''')
+
+    print(f"  Created {pkg_name}/ with:")
+    print(f"    src/{pkg_name}/adapter.py    {class_name}Adapter skeleton")
+    print(f"    mcp/server.py                MCP server for Claude Code")
+    print(f"    examples/quickstart.py       Quick start demo")
+    print(f"    tests/test_adapter.py        Test skeleton")
+    print(f"    pyproject.toml               Entry point registered")
+    print(f"\n  Next steps:")
+    print(f"    cd {pkg_name}")
+    print(f"    pip install -e .")
+    print(f"    python -m pytest tests/")
+
+
+def _write(path: str, content: str):
+    """Write a file, creating parent directories."""
+    import os
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(content)
 
 
 def _hero():
