@@ -129,14 +129,14 @@ class OpenAICompatBackend:
 
         self._previous_response_id = response.id
 
-        # Check for pending safety checks — don't silently ignore
+        # Check for pending safety checks on computer_call items
         for item in getattr(response, "output", []):
-            if getattr(item, "type", None) == "pending_safety_checks":
-                logger.warning(
-                    "CU response contains pending_safety_checks: %s", item
-                )
-                response._has_safety_checks = True
-                break
+            if getattr(item, "type", None) == "computer_call":
+                checks = getattr(item, "pending_safety_checks", [])
+                if checks:
+                    logger.warning("CU pending safety checks: %s", checks)
+                    response._has_safety_checks = True
+                    break
 
         return response
 
