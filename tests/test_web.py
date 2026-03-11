@@ -104,6 +104,16 @@ class TestPlateReaderEndpoints:
         assert data["mode"] == "fluorescence"
         assert data["metadata"]["excitation_nm"] == 485
 
+    def test_analyze_elisa(self, client):
+        res = client.get("/api/plate-reader/analyze/ELISA_IL6_plate1")
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("text/event-stream")
+
+    def test_analyze_viability(self, client):
+        res = client.get("/api/plate-reader/analyze/CellViability_DrugScreen")
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("text/event-stream")
+
 
 # ── Tools Endpoint ───────────────────────────────────────────────
 

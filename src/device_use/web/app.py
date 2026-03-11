@@ -298,6 +298,33 @@ def plate_reader_process(name: str):
     }
 
 
+@app.get("/api/plate-reader/analyze/{name}")
+def plate_reader_analyze(name: str):
+    """Stream AI analysis of plate reader data as Server-Sent Events."""
+    orch = _get_orchestrator()
+    reader = orch.registry.get_instrument("PlateReader")
+    if not reader:
+        raise HTTPException(404, "PlateReader not registered")
+
+    reading = reader.process(name)
+
+    from device_use.instruments.plate_reader.brain import PlateReaderBrain
+    brain = PlateReaderBrain()
+
+    def event_stream():
+        yield f"data: {json.dumps({'type': 'start'})}\n\n"
+        t0 = time.time()
+        try:
+            for chunk in brain.interpret_reading(reading, stream=True):
+                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+            dt = time.time() - t0
+            yield f"data: {json.dumps({'type': 'done', 'time_s': round(dt, 1)})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 # ── Frontend ──────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -578,10 +605,14 @@ _INDEX_HTML = """\
         <h2 id="plateTitle" style="color: var(--magenta);"></h2>
         <span id="plateSubtitle" style="color: var(--dim); font-size: 0.85rem;"></span>
       </div>
+      <div class="btn-row">
+        <button class="btn" id="btnPlateAnalyze" onclick="runPlateAnalysis()" style="border-color: var(--magenta); color: var(--magenta);">AI Analysis</button>
+      </div>
     </div>
     <div class="meta-grid" id="plateMeta"></div>
     <img class="spectrum-img" id="platePlotImg" style="display:none;" />
     <div id="plateHeatmap" style="margin: 1rem 0;"></div>
+    <div class="ai-panel" id="plateAiPanel" style="display:none;"></div>
   </div>
 </div>
 
@@ -589,6 +620,7 @@ _INDEX_HTML = """\
 let currentSample = null;
 let currentExpno = null;
 let currentTitle = '';
+let currentPlateName = null;
 
 async function init() {
   // Get instrument status
@@ -791,12 +823,14 @@ async function runPubchem() {
 }
 
 async function selectPlate(name) {
+  currentPlateName = name;
   // Highlight active card
   document.querySelectorAll('#plateDatasets .dataset-card').forEach(c => c.classList.remove('active'));
   event.currentTarget.classList.add('active');
 
   const panel = document.getElementById('platePanel');
   panel.classList.add('visible');
+  document.getElementById('plateAiPanel').style.display = 'none';
   document.getElementById('plateTitle').textContent = name;
   document.getElementById('plateMeta').innerHTML = '<span class="loading">Processing...</span>';
   document.getElementById('plateHeatmap').innerHTML = '';
@@ -850,6 +884,51 @@ async function selectPlate(name) {
     document.getElementById('plateHeatmap').innerHTML = html;
   } catch (e) {
     document.getElementById('plateMeta').innerHTML = `<span style="color:red;">Failed: ${e.message}</span>`;
+  }
+}
+
+async function runPlateAnalysis() {
+  if (!currentPlateName) return;
+
+  const panel = document.getElementById('plateAiPanel');
+  panel.style.display = 'block';
+  panel.innerHTML = '<span class="loading">Claude is analyzing the plate data...</span>';
+  document.getElementById('btnPlateAnalyze').disabled = true;
+
+  try {
+    const es = new EventSource(`/api/plate-reader/analyze/${encodeURIComponent(currentPlateName)}`);
+    let text = '';
+
+    es.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'chunk') {
+        text += data.text;
+        if (typeof marked !== 'undefined') {
+          panel.innerHTML = marked.parse(text);
+        } else {
+          panel.innerText = text;
+        }
+        panel.scrollTop = panel.scrollHeight;
+      } else if (data.type === 'done') {
+        es.close();
+        document.getElementById('btnPlateAnalyze').disabled = false;
+        if (typeof marked !== 'undefined') {
+          panel.innerHTML = marked.parse(text) + `<p style="color:var(--dim);margin-top:1rem;">(${data.time_s}s)</p>`;
+        }
+      } else if (data.type === 'error') {
+        es.close();
+        document.getElementById('btnPlateAnalyze').disabled = false;
+        panel.innerHTML = `<span style="color:red;">Error: ${data.message}</span>`;
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      document.getElementById('btnPlateAnalyze').disabled = false;
+    };
+  } catch (e) {
+    panel.innerHTML = `<span style="color:red;">Error: ${e.message}</span>`;
+    document.getElementById('btnPlateAnalyze').disabled = false;
   }
 }
 
