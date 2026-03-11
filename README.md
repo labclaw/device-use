@@ -299,7 +299,7 @@ device-use/
 
 ## Working Demos (Multi-Instrument MVP)
 
-Two instrument types, 12 demos, 329 tests — all running without API keys:
+Two instrument types, 14 demos, 349 tests — all running without API keys:
 
 ```bash
 # Setup
@@ -315,6 +315,7 @@ python demos/topspin_batch.py             # 8 compounds + PubChem
 python demos/topspin_blind_challenge.py   # AI identifies unknowns from peaks alone
 python demos/topspin_ai_scientist.py      # Full AI scientist pipeline
 python demos/topspin_pipeline.py          # Orchestrator middleware demo
+python demos/topspin_library.py          # Spectral library fingerprint matching
 
 # Multi-instrument demos
 python demos/multi_instrument_demo.py     # Two instruments, same Orchestrator
@@ -322,6 +323,7 @@ python demos/lab_report_demo.py           # Raw data → paper-ready report
 python demos/streaming_demo.py            # Real-time event stream
 python demos/topspin_compare.py           # Side-by-side spectral comparison
 python demos/topspin_reaction_monitor.py  # Autonomous reaction monitoring
+python demos/benchmark.py                # Performance benchmark
 
 # Web GUI
 ./demos/run_web.sh                        # http://localhost:8420
