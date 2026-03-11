@@ -187,6 +187,23 @@ print(result.actions)    # every click, keystroke, verification
 print(result.duration)   # how long it took
 ```
 
+### MCP Server (Claude Code Integration)
+
+Connect Claude Code directly to lab instruments:
+
+```json
+{
+  "mcpServers": {
+    "device-use": {
+      "command": "python",
+      "args": ["-m", "device_use.integrations.mcp_server"]
+    }
+  }
+}
+```
+
+Then in Claude Code: *"List NMR datasets"*, *"Process the ethanol sample"*, *"Run plate reader ELISA assay"* — Claude calls the instrument tools directly.
+
 ### With LabClaw
 
 ```python
@@ -282,7 +299,7 @@ device-use/
 
 ## Working Demos (Multi-Instrument MVP)
 
-Two instrument types, 12 demos, 307 tests — all running without API keys:
+Two instrument types, 12 demos, 329 tests — all running without API keys:
 
 ```bash
 # Setup
