@@ -300,17 +300,17 @@ class TestExtractComputerCalls:
 
 
 class TestCallParameters:
-    async def test_call_passes_correct_parameters(
+    async def test_chat_call_passes_correct_parameters(
         self, backend: OpenAICompatBackend
     ):
-        """Verify that _call sends correct model, max_tokens, temperature."""
+        """Verify that _chat_call sends correct model, max_tokens, temperature."""
         mock_create = AsyncMock(
             return_value=_make_chat_response("test")
         )
         with patch.object(
             backend._client.chat.completions, "create", mock_create
         ):
-            await backend._call(
+            await backend._chat_call(
                 [{"role": "user", "content": "hello"}], temperature=0.5
             )
 
@@ -319,3 +319,385 @@ class TestCallParameters:
         assert call_kwargs["model"] == "gpt-4o"
         assert call_kwargs["max_tokens"] == 4096
         assert call_kwargs["temperature"] == 0.5
+
+
+# ===================================================================
+# GPT-5.4 Computer Use path tests
+# ===================================================================
+
+
+from device_use.backends.openai_compat import _supports_computer_use
+from device_use.actions.models import (
+    ClickAction,
+    DragAction,
+    HotkeyAction,
+    MoveAction,
+    ScrollAction,
+    ScreenshotAction,
+    WaitAction,
+    parse_action,
+)
+
+
+# ---------------------------------------------------------------------------
+# _supports_computer_use
+# ---------------------------------------------------------------------------
+
+
+class TestSupportsComputerUse:
+    def test_gpt54(self):
+        assert _supports_computer_use("gpt-5.4") is True
+
+    def test_gpt54_pro(self):
+        assert _supports_computer_use("gpt-5.4-pro") is True
+
+    def test_computer_use_preview(self):
+        assert _supports_computer_use("computer-use-preview") is True
+
+    def test_gpt4o_not_supported(self):
+        assert _supports_computer_use("gpt-4o") is False
+
+    def test_claude_not_supported(self):
+        assert _supports_computer_use("claude-3-opus") is False
+
+
+# ---------------------------------------------------------------------------
+# _map_cu_action — all action types
+# ---------------------------------------------------------------------------
+
+
+class TestMapCUAction:
+    """Test _map_cu_action() for every GPT-5.4 CU action type."""
+
+    def test_click(self):
+        cu = {"action_type": "click", "x": 100, "y": 200}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, ClickAction)
+        assert action.x == 100
+        assert action.y == 200
+        assert action.button == "left"
+
+    def test_double_click(self):
+        cu = {"action_type": "double_click", "x": 50, "y": 60}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert action.action_type.value == "double_click"
+
+    def test_right_click_via_action_type(self):
+        cu = {"action_type": "right_click", "x": 10, "y": 20}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, ClickAction)
+        assert action.button == "right"
+
+    def test_right_click_via_button_field(self):
+        cu = {"action_type": "click", "x": 10, "y": 20, "button": "right"}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, ClickAction)
+        assert action.button == "right"
+
+    def test_middle_click_via_button_field(self):
+        cu = {"action_type": "click", "x": 10, "y": 20, "button": "middle"}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, ClickAction)
+        assert action.button == "middle"
+
+    def test_scroll(self):
+        cu = {"action_type": "scroll", "x": 10, "y": 20, "scroll_x": 0, "scroll_y": -120}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, ScrollAction)
+        assert action.x == 10
+        assert action.y == 20
+        assert action.clicks == -1
+
+    def test_scroll_large_delta(self):
+        cu = {"action_type": "scroll", "x": 0, "y": 0, "scroll_x": 0, "scroll_y": -360}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert action.clicks == -3
+
+    def test_scroll_up(self):
+        cu = {"action_type": "scroll", "x": 0, "y": 0, "scroll_x": 0, "scroll_y": 120}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert action.clicks == 1
+
+    def test_scroll_zero(self):
+        cu = {"action_type": "scroll", "x": 0, "y": 0, "scroll_x": 0, "scroll_y": 0}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert action.clicks == 0
+
+    def test_drag(self):
+        cu = {
+            "action_type": "drag",
+            "path": [{"x": 10, "y": 20}, {"x": 30, "y": 40}],
+        }
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, DragAction)
+        assert action.start_x == 10
+        assert action.start_y == 20
+        assert action.end_x == 30
+        assert action.end_y == 40
+
+    def test_drag_multi_point_path(self):
+        cu = {
+            "action_type": "drag",
+            "path": [{"x": 1, "y": 2}, {"x": 5, "y": 5}, {"x": 10, "y": 20}],
+        }
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert action.start_x == 1
+        assert action.start_y == 2
+        assert action.end_x == 10
+        assert action.end_y == 20
+
+    def test_drag_empty_path(self):
+        cu = {"action_type": "drag", "path": []}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, DragAction)
+        assert action.start_x == 0
+
+    def test_move(self):
+        cu = {"action_type": "move", "x": 50, "y": 60}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, MoveAction)
+        assert action.x == 50
+        assert action.y == 60
+
+    def test_keypress(self):
+        cu = {"action_type": "keypress", "keys": ["ctrl", "s"]}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, HotkeyAction)
+        assert action.keys == ["ctrl", "s"]
+
+    def test_type(self):
+        cu = {"action_type": "type", "text": "hello world"}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert action.text == "hello world"
+
+    def test_wait(self):
+        cu = {"action_type": "wait"}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, WaitAction)
+
+    def test_screenshot(self):
+        cu = {"action_type": "screenshot"}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert isinstance(action, ScreenshotAction)
+
+    def test_call_id_propagated(self):
+        cu = {"action_type": "click", "x": 1, "y": 2, "call_id": "call_abc123"}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        assert result["call_id"] == "call_abc123"
+
+    def test_result_structure(self):
+        cu = {"action_type": "click", "x": 1, "y": 2}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        assert "reasoning" in result
+        assert "action" in result
+        assert "done" in result
+        assert "confidence" in result
+        assert result["done"] is False
+
+
+# ---------------------------------------------------------------------------
+# _plan_native with mocked response
+# ---------------------------------------------------------------------------
+
+
+def _make_cu_response(
+    actions,
+    call_id="call_123",
+    response_id="resp_abc",
+    pending_safety_checks=None,
+):
+    """Create a mock Responses API response with computer_call."""
+    action_objs = [SimpleNamespace(**a) for a in actions]
+
+    computer_call = SimpleNamespace(
+        type="computer_call",
+        call_id=call_id,
+        actions=action_objs,
+        action=action_objs[0] if action_objs else None,
+        pending_safety_checks=pending_safety_checks or [],
+    )
+
+    return SimpleNamespace(
+        id=response_id,
+        output=[computer_call],
+        output_text="",
+    )
+
+
+def _make_text_response_cu(text, response_id="resp_text"):
+    """Create a mock response with no computer_call (task done)."""
+    return SimpleNamespace(
+        id=response_id,
+        output=[SimpleNamespace(type="message", content=text)],
+        output_text=text,
+    )
+
+
+class TestPlanNative:
+    @pytest.fixture
+    def cu_backend(self):
+        return OpenAICompatBackend(model="gpt-5.4", api_key="sk-test")
+
+    @pytest.mark.asyncio
+    async def test_returns_mapped_action(self, cu_backend):
+        mock_resp = _make_cu_response([
+            {"type": "click", "x": 100, "y": 200, "button": "left"},
+        ])
+        cu_backend._responses_create = AsyncMock(return_value=mock_resp)
+
+        result = await cu_backend._plan_native(b"fake_png", "click the button")
+        assert result["action"]["action_type"] == "click"
+        assert result["call_id"] == "call_123"
+        assert result["done"] is False
+
+    @pytest.mark.asyncio
+    async def test_batched_actions(self, cu_backend):
+        mock_resp = _make_cu_response([
+            {"type": "click", "x": 10, "y": 20, "button": "left"},
+            {"type": "type", "text": "hello"},
+        ])
+        cu_backend._responses_create = AsyncMock(return_value=mock_resp)
+
+        result = await cu_backend._plan_native(b"fake_png", "type in field")
+        assert result["action"]["action_type"] == "click"
+        assert len(result["_remaining_actions"]) == 1
+        assert result["_remaining_actions"][0]["action"]["text"] == "hello"
+
+    @pytest.mark.asyncio
+    async def test_no_computer_call_returns_done(self, cu_backend):
+        mock_resp = _make_text_response_cu("Task completed successfully")
+        cu_backend._responses_create = AsyncMock(return_value=mock_resp)
+
+        result = await cu_backend._plan_native(b"fake_png", "do something")
+        assert result["done"] is True
+        assert result["data"]["response"] == "Task completed successfully"
+
+
+# ---------------------------------------------------------------------------
+# pending_safety_checks detection
+# ---------------------------------------------------------------------------
+
+
+class TestPendingSafetyChecks:
+    @pytest.fixture
+    def cu_backend(self):
+        return OpenAICompatBackend(model="gpt-5.4", api_key="sk-test")
+
+    @pytest.mark.asyncio
+    async def test_safety_checks_detected(self, cu_backend):
+        mock_resp = _make_cu_response(
+            [{"type": "click", "x": 1, "y": 2, "button": "left"}],
+            pending_safety_checks=[{"id": "sc_1", "code": "malicious_instructions"}],
+        )
+        cu_backend._responses_create = AsyncMock(return_value=mock_resp)
+
+        response = await cu_backend._computer_use_step(b"png", "task")
+        assert getattr(response, "_has_safety_checks", False) is True
+
+    @pytest.mark.asyncio
+    async def test_no_safety_checks_clean(self, cu_backend):
+        mock_resp = _make_cu_response(
+            [{"type": "click", "x": 1, "y": 2, "button": "left"}],
+            pending_safety_checks=[],
+        )
+        cu_backend._responses_create = AsyncMock(return_value=mock_resp)
+
+        response = await cu_backend._computer_use_step(b"png", "task")
+        assert getattr(response, "_has_safety_checks", False) is False
+
+    @pytest.mark.asyncio
+    async def test_cu_loop_aborts_on_safety_checks(self, cu_backend):
+        mock_resp = _make_cu_response(
+            [{"type": "click", "x": 1, "y": 2, "button": "left"}],
+            pending_safety_checks=[{"id": "sc_1", "code": "unsafe"}],
+        )
+        cu_backend._responses_create = AsyncMock(return_value=mock_resp)
+
+        actions = await cu_backend.run_cu_loop(
+            task="test",
+            take_screenshot=AsyncMock(return_value=b"png"),
+            execute_action=AsyncMock(),
+            max_turns=5,
+        )
+        assert len(actions) == 0  # Aborted before executing any action
+
+
+# ---------------------------------------------------------------------------
+# Batched actions in run_cu_loop
+# ---------------------------------------------------------------------------
+
+
+class TestCULoopBatched:
+    @pytest.mark.asyncio
+    async def test_all_actions_executed(self):
+        cu_backend = OpenAICompatBackend(model="gpt-5.4", api_key="sk-test")
+
+        # First turn: batch of 2 actions. Second turn: no actions (done).
+        call_count = 0
+
+        async def mock_responses_create(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _make_cu_response([
+                    {"type": "click", "x": 10, "y": 20, "button": "left"},
+                    {"type": "type", "text": "hello"},
+                ])
+            return _make_text_response_cu("done")
+
+        cu_backend._responses_create = mock_responses_create
+
+        executed = []
+
+        async def mock_execute(action):
+            executed.append(action)
+
+        actions = await cu_backend.run_cu_loop(
+            task="type in field",
+            take_screenshot=AsyncMock(return_value=b"png"),
+            execute_action=mock_execute,
+            max_turns=5,
+        )
+        assert len(actions) == 2
+
+
+# ---------------------------------------------------------------------------
+# Session management for GPT-5.4
+# ---------------------------------------------------------------------------
+
+
+class TestCUSessionManagement:
+    def test_reset_session_clears_response_id(self):
+        cu_backend = OpenAICompatBackend(model="gpt-5.4", api_key="sk-test")
+        cu_backend._previous_response_id = "resp_old"
+        cu_backend.reset_session()
+        assert cu_backend._previous_response_id is None
+
+    def test_supports_grounding_for_cu_model(self):
+        cu_backend = OpenAICompatBackend(model="gpt-5.4", api_key="sk-test")
+        assert cu_backend.supports_grounding is True
+
+    def test_native_cu_flag_set(self):
+        cu_backend = OpenAICompatBackend(model="gpt-5.4", api_key="sk-test")
+        assert cu_backend._native_cu is True
+
+    def test_native_cu_flag_not_set_for_legacy(self):
+        legacy = OpenAICompatBackend(model="gpt-4o", api_key="sk-test")
+        assert legacy._native_cu is False
