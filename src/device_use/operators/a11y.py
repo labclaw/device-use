@@ -53,9 +53,17 @@ class AccessibilityOperator(BaseOperator):
         """Read comprehensive application state (async wrapper)."""
         return self.read_state_sync()
 
-    async def wait_ready(self, timeout_s: float = 10.0) -> bool:
+    async def wait_ready(self, timeout_s: float = 30.0) -> bool:
         """Wait until the application is ready for the next command."""
-        return self.wait_for_status("done", timeout_s=timeout_s)
+        import asyncio
+
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            lines = self.get_status_text()
+            if any("done" in line.lower() for line in lines):
+                return True
+            await asyncio.sleep(1.0)
+        return False
 
     # ------------------------------------------------------------------
     # Framework loading
@@ -83,6 +91,8 @@ class AccessibilityOperator(BaseOperator):
         ]
 
         # CF functions
+        self._cf.CFRelease.argtypes = [c_void_p]
+        self._cf.CFRelease.restype = None
         self._cf.CFStringCreateWithCString.restype = c_void_p
         self._cf.CFStringCreateWithCString.argtypes = [
             c_void_p, ctypes.c_char_p, c_uint32,
@@ -142,14 +152,22 @@ class AccessibilityOperator(BaseOperator):
 
     def _get_str(self, el: c_void_p, name: str) -> str | None:
         err, val = self._get_attr(el, name)
-        return self._to_py(val) if err == 0 else None
+        if err != 0 or not val:
+            return None
+        try:
+            return self._to_py(val)
+        finally:
+            self._cf.CFRelease(val)
 
     def _get_children(self, el: c_void_p) -> list[c_void_p]:
         err, ch = self._get_attr(el, "AXChildren")
         if err != 0 or not ch:
             return []
-        count = self._cf.CFArrayGetCount(ch)
-        return [self._cf.CFArrayGetValueAtIndex(ch, i) for i in range(count)]
+        try:
+            count = self._cf.CFArrayGetCount(ch)
+            return [self._cf.CFArrayGetValueAtIndex(ch, i) for i in range(count)]
+        finally:
+            self._cf.CFRelease(ch)
 
     # ------------------------------------------------------------------
     # Public API: Read state
