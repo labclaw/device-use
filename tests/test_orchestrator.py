@@ -383,3 +383,87 @@ class TestCreateOrchestrator:
         names = [t.name for t in tools]
         assert "topspin.list_datasets" in names
         assert "platereader.process" in names
+
+
+# ── Parallel Pipeline ────────────────────────────────────────
+
+class TestParallelPipeline:
+    def test_parallel_steps_run(self):
+        """Steps with the same parallel group run together."""
+        import time
+        orch = Orchestrator()
+
+        pipeline = Pipeline("parallel_test")
+        pipeline.add_step(PipelineStep(
+            name="a",
+            handler=lambda ctx: (time.sleep(0.05), "a_done")[1],
+            parallel="group1",
+        ))
+        pipeline.add_step(PipelineStep(
+            name="b",
+            handler=lambda ctx: (time.sleep(0.05), "b_done")[1],
+            parallel="group1",
+        ))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert result.outputs["a"] == "a_done"
+        assert result.outputs["b"] == "b_done"
+        # Parallel should be faster than sequential (< 100ms for 2x50ms)
+        assert result.duration_ms < 150
+
+    def test_parallel_then_sequential(self):
+        """Parallel group followed by sequential step."""
+        orch = Orchestrator()
+
+        pipeline = Pipeline("mixed_test")
+        pipeline.add_step(PipelineStep(
+            name="p1", handler=lambda ctx: 10, parallel="load",
+        ))
+        pipeline.add_step(PipelineStep(
+            name="p2", handler=lambda ctx: 20, parallel="load",
+        ))
+        pipeline.add_step(PipelineStep(
+            name="combine",
+            handler=lambda ctx: ctx["p1"] + ctx["p2"],
+        ))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert result.outputs["combine"] == 30
+
+    def test_batching_groups_consecutive(self):
+        """Only consecutive steps with the same tag form a group."""
+        orch = Orchestrator()
+
+        pipeline = Pipeline("batch_test")
+        pipeline.add_step(PipelineStep(name="a", handler=lambda ctx: 1, parallel="g"))
+        pipeline.add_step(PipelineStep(name="b", handler=lambda ctx: 2, parallel="g"))
+        pipeline.add_step(PipelineStep(name="c", handler=lambda ctx: 3))  # sequential
+        pipeline.add_step(PipelineStep(name="d", handler=lambda ctx: 4, parallel="g"))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert len(result.steps) == 4
+        assert result.outputs == {"a": 1, "b": 2, "c": 3, "d": 4}
+
+    def test_parallel_failure_stops_pipeline(self):
+        """If a parallel step fails, the pipeline stops."""
+        orch = Orchestrator()
+
+        pipeline = Pipeline("fail_parallel")
+        pipeline.add_step(PipelineStep(
+            name="ok", handler=lambda ctx: "fine", parallel="g",
+        ))
+        pipeline.add_step(PipelineStep(
+            name="fail", handler=lambda ctx: 1 / 0, parallel="g",
+        ))
+        pipeline.add_step(PipelineStep(
+            name="never", handler=lambda ctx: "unreachable",
+        ))
+
+        result = orch.run(pipeline)
+        assert not result.success
+        # The "never" step should not have run
+        step_names = [name for name, _ in result.steps]
+        assert "never" not in step_names

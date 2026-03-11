@@ -189,6 +189,9 @@ class PipelineStep:
       - Run an arbitrary callable (handler)
 
     If both are provided, tool_name takes priority.
+
+    Use ``parallel`` to group steps that can run concurrently.  Steps
+    with the same ``parallel`` string run together in a thread pool.
     """
     name: str
     description: str = ""
@@ -196,6 +199,7 @@ class PipelineStep:
     handler: Callable[..., Any] | None = None  # or an inline callable
     params: dict[str, Any] = field(default_factory=dict)
     condition: Callable[[dict[str, Any]], bool] | None = None  # skip if returns False
+    parallel: str = ""  # group name — steps in same group run concurrently
 
 
 @dataclass
@@ -361,6 +365,9 @@ class Orchestrator:
 
         For tool calls: step.params are passed as kwargs to the tool handler.
         For inline handlers: the handler is called with (context, **params).
+
+        Steps with the same ``parallel`` group name run concurrently using
+        a thread pool.  Steps without a parallel group run sequentially.
         """
         self._emit(Event(
             event_type=EventType.PIPELINE_START,
@@ -370,65 +377,33 @@ class Orchestrator:
         context: dict[str, Any] = {}
         result = PipelineResult(name=pipeline.name)
         pipeline_start = time.monotonic()
+        failed = False
 
-        for step in pipeline.steps:
-            # Condition check — skip step if condition returns False
-            if step.condition is not None and not step.condition(context):
-                step_result = StepResult(status=StepStatus.SKIPPED)
+        # Group consecutive steps by their parallel tag
+        batches = self._build_batches(pipeline.steps)
+
+        for batch in batches:
+            if failed:
+                break
+
+            if len(batch) == 1 and not batch[0].parallel:
+                # Single sequential step
+                step = batch[0]
+                step_result = self._run_single_step(step, context, pipeline.name)
                 result.steps.append((step.name, step_result))
-                logger.info("Skipped step: %s", step.name)
-                continue
-
-            self._emit(Event(
-                event_type=EventType.STEP_START,
-                data={
-                    "pipeline": pipeline.name,
-                    "step": step.name,
-                    "description": step.description,
-                },
-            ))
-
-            step_start = time.monotonic()
-            try:
-                output = self._execute_step(step, context)
-                duration_ms = (time.monotonic() - step_start) * 1000
-                step_result = StepResult(
-                    status=StepStatus.COMPLETED,
-                    output=output,
-                    duration_ms=duration_ms,
-                )
-                context[step.name] = output
-
-                self._emit(Event(
-                    event_type=EventType.STEP_END,
-                    data={
-                        "pipeline": pipeline.name,
-                        "step": step.name,
-                        "duration_ms": duration_ms,
-                    },
-                ))
-                logger.info("Completed step: %s (%.0fms)", step.name, duration_ms)
-
-            except Exception as exc:
-                duration_ms = (time.monotonic() - step_start) * 1000
-                step_result = StepResult(
-                    status=StepStatus.FAILED,
-                    error=str(exc),
-                    duration_ms=duration_ms,
-                )
-                self._emit(Event(
-                    event_type=EventType.STEP_ERROR,
-                    data={
-                        "pipeline": pipeline.name,
-                        "step": step.name,
-                        "error": str(exc),
-                    },
-                ))
-                logger.error("Step %s failed: %s", step.name, exc)
-                result.steps.append((step.name, step_result))
-                break  # stop pipeline on first failure
-
-            result.steps.append((step.name, step_result))
+                if step_result.status == StepStatus.COMPLETED:
+                    context[step.name] = step_result.output
+                elif step_result.status == StepStatus.FAILED:
+                    failed = True
+            else:
+                # Parallel batch — run in thread pool
+                step_results = self._run_parallel_batch(batch, context, pipeline.name)
+                for step, sr in zip(batch, step_results):
+                    result.steps.append((step.name, sr))
+                    if sr.status == StepStatus.COMPLETED:
+                        context[step.name] = sr.output
+                    elif sr.status == StepStatus.FAILED:
+                        failed = True
 
         result.duration_ms = (time.monotonic() - pipeline_start) * 1000
 
@@ -441,6 +416,76 @@ class Orchestrator:
             },
         ))
         return result
+
+    @staticmethod
+    def _build_batches(steps: list[PipelineStep]) -> list[list[PipelineStep]]:
+        """Group consecutive steps with the same parallel tag into batches."""
+        batches: list[list[PipelineStep]] = []
+        for step in steps:
+            if step.parallel and batches and batches[-1][0].parallel == step.parallel:
+                batches[-1].append(step)
+            else:
+                batches.append([step])
+        return batches
+
+    def _run_single_step(
+        self, step: PipelineStep, context: dict[str, Any], pipeline_name: str
+    ) -> StepResult:
+        """Run one step sequentially."""
+        if step.condition is not None and not step.condition(context):
+            logger.info("Skipped step: %s", step.name)
+            return StepResult(status=StepStatus.SKIPPED)
+
+        self._emit(Event(
+            event_type=EventType.STEP_START,
+            data={"pipeline": pipeline_name, "step": step.name,
+                  "description": step.description},
+        ))
+
+        step_start = time.monotonic()
+        try:
+            output = self._execute_step(step, context)
+            duration_ms = (time.monotonic() - step_start) * 1000
+            self._emit(Event(
+                event_type=EventType.STEP_END,
+                data={"pipeline": pipeline_name, "step": step.name,
+                      "duration_ms": duration_ms},
+            ))
+            logger.info("Completed step: %s (%.0fms)", step.name, duration_ms)
+            return StepResult(status=StepStatus.COMPLETED, output=output,
+                              duration_ms=duration_ms)
+        except Exception as exc:
+            duration_ms = (time.monotonic() - step_start) * 1000
+            self._emit(Event(
+                event_type=EventType.STEP_ERROR,
+                data={"pipeline": pipeline_name, "step": step.name,
+                      "error": str(exc)},
+            ))
+            logger.error("Step %s failed: %s", step.name, exc)
+            return StepResult(status=StepStatus.FAILED, error=str(exc),
+                              duration_ms=duration_ms)
+
+    def _run_parallel_batch(
+        self, batch: list[PipelineStep], context: dict[str, Any],
+        pipeline_name: str,
+    ) -> list[StepResult]:
+        """Run a batch of steps concurrently in a thread pool."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        results: list[StepResult | None] = [None] * len(batch)
+
+        def _run_one(idx: int, step: PipelineStep) -> None:
+            results[idx] = self._run_single_step(step, context, pipeline_name)
+
+        with ThreadPoolExecutor(max_workers=len(batch)) as pool:
+            futures = [
+                pool.submit(_run_one, i, step)
+                for i, step in enumerate(batch)
+            ]
+            for f in futures:
+                f.result()  # propagate exceptions
+
+        return results  # type: ignore[return-value]
 
     def _execute_step(self, step: PipelineStep, context: dict[str, Any]) -> Any:
         """Execute a single step, resolving tool or inline handler.
