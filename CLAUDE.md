@@ -65,7 +65,7 @@ demos/
 tests/
   test_nmr.py              # NMR module tests
   test_plate_reader.py     # Plate reader + brain tests (22 tests)
-  test_orchestrator.py     # Pipeline + registry + parallel + retry tests (37 tests)
+  test_orchestrator.py     # Pipeline + registry + parallel + retry tests (44 tests)
   test_mcp_server.py       # MCP server integration tests (12 tests)
   test_tools.py            # External tool tests
   test_web.py              # Web API endpoint tests (16 tests)
@@ -78,7 +78,7 @@ tests/
 - **TopSpin 5.0.0** examdata at `/opt/topspin5.0.0/examdata/`
 - Install: `pip install -e ".[nmr,dev]"`
 - Run demos: `python demos/<script>.py` or `python -m device_use demo`
-- Run tests: `python -m pytest tests/` (329 tests)
+- Run tests: `python -m pytest tests/` (336 tests)
 - CLI: `python -m device_use status` / `instruments` / `demo`
 - Web GUI: `./demos/run_web.sh` (port 8420)
 
@@ -93,6 +93,8 @@ tests/
 - **Retry + timeout**: `PipelineStep(retries=2, timeout_s=10)` for flaky instruments
 - **Parallel steps**: `PipelineStep(parallel="group1")` for concurrent execution
 - **MCP server**: `python -m device_use.integrations.mcp_server` for Claude Code
+- **Scaffold**: `device-use scaffold zeiss-zen` generates a new device package
+- **Pipeline viz**: `pipeline.describe()` (plan) and `result.summary()` (results)
 
 ## Git
 
