@@ -299,7 +299,7 @@ device-use/
 
 ## Working Demos (Multi-Instrument MVP)
 
-Two instrument types, 14 demos, 349 tests — all running without API keys:
+Two instrument types, 15 demos, 355 tests — all running without API keys:
 
 ```bash
 # Setup
@@ -324,6 +324,7 @@ python demos/streaming_demo.py            # Real-time event stream
 python demos/topspin_compare.py           # Side-by-side spectral comparison
 python demos/topspin_reaction_monitor.py  # Autonomous reaction monitoring
 python demos/benchmark.py                # Performance benchmark
+python demos/showcase.py                 # All features in one script (pitch demo)
 
 # Web GUI
 ./demos/run_web.sh                        # http://localhost:8420
