@@ -192,6 +192,9 @@ class PipelineStep:
 
     Use ``parallel`` to group steps that can run concurrently.  Steps
     with the same ``parallel`` string run together in a thread pool.
+
+    Use ``retries`` for automatic retry on failure (e.g. flaky instrument
+    connections).  Use ``timeout_s`` to cap execution time.
     """
     name: str
     description: str = ""
@@ -200,6 +203,8 @@ class PipelineStep:
     params: dict[str, Any] = field(default_factory=dict)
     condition: Callable[[dict[str, Any]], bool] | None = None  # skip if returns False
     parallel: str = ""  # group name — steps in same group run concurrently
+    retries: int = 0  # number of retry attempts on failure
+    timeout_s: float = 0  # max seconds per attempt (0 = no limit)
 
 
 @dataclass
@@ -431,7 +436,7 @@ class Orchestrator:
     def _run_single_step(
         self, step: PipelineStep, context: dict[str, Any], pipeline_name: str
     ) -> StepResult:
-        """Run one step sequentially."""
+        """Run one step, with optional retries and timeout."""
         if step.condition is not None and not step.condition(context):
             logger.info("Skipped step: %s", step.name)
             return StepResult(status=StepStatus.SKIPPED)
@@ -442,27 +447,44 @@ class Orchestrator:
                   "description": step.description},
         ))
 
+        attempts = 1 + step.retries
+        last_error = ""
         step_start = time.monotonic()
-        try:
-            output = self._execute_step(step, context)
-            duration_ms = (time.monotonic() - step_start) * 1000
-            self._emit(Event(
-                event_type=EventType.STEP_END,
-                data={"pipeline": pipeline_name, "step": step.name,
-                      "duration_ms": duration_ms},
-            ))
-            logger.info("Completed step: %s (%.0fms)", step.name, duration_ms)
-            return StepResult(status=StepStatus.COMPLETED, output=output,
-                              duration_ms=duration_ms)
-        except Exception as exc:
-            duration_ms = (time.monotonic() - step_start) * 1000
-            self._emit(Event(
-                event_type=EventType.STEP_ERROR,
-                data={"pipeline": pipeline_name, "step": step.name,
-                      "error": str(exc)},
-            ))
-            logger.error("Step %s failed: %s", step.name, exc)
-            return StepResult(status=StepStatus.FAILED, error=str(exc),
+
+        for attempt in range(attempts):
+            if attempt > 0:
+                logger.info("Retrying step %s (attempt %d/%d)",
+                            step.name, attempt + 1, attempts)
+
+            try:
+                output = self._execute_step_with_timeout(step, context)
+                duration_ms = (time.monotonic() - step_start) * 1000
+                self._emit(Event(
+                    event_type=EventType.STEP_END,
+                    data={"pipeline": pipeline_name, "step": step.name,
+                          "duration_ms": duration_ms,
+                          "attempts": attempt + 1},
+                ))
+                logger.info("Completed step: %s (%.0fms, attempt %d)",
+                            step.name, duration_ms, attempt + 1)
+                return StepResult(status=StepStatus.COMPLETED, output=output,
+                                  duration_ms=duration_ms)
+            except Exception as exc:
+                last_error = str(exc)
+                if attempt < attempts - 1:
+                    logger.warning("Step %s attempt %d failed: %s",
+                                   step.name, attempt + 1, exc)
+                    continue
+
+        duration_ms = (time.monotonic() - step_start) * 1000
+        self._emit(Event(
+            event_type=EventType.STEP_ERROR,
+            data={"pipeline": pipeline_name, "step": step.name,
+                  "error": last_error, "attempts": attempts},
+        ))
+        logger.error("Step %s failed after %d attempts: %s",
+                     step.name, attempts, last_error)
+        return StepResult(status=StepStatus.FAILED, error=last_error,
                               duration_ms=duration_ms)
 
     def _run_parallel_batch(
@@ -486,6 +508,25 @@ class Orchestrator:
                 f.result()  # propagate exceptions
 
         return results  # type: ignore[return-value]
+
+    def _execute_step_with_timeout(
+        self, step: PipelineStep, context: dict[str, Any]
+    ) -> Any:
+        """Execute a step, enforcing timeout_s if set."""
+        if step.timeout_s <= 0:
+            return self._execute_step(step, context)
+
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(self._execute_step, step, context)
+            try:
+                return future.result(timeout=step.timeout_s)
+            except FuturesTimeout:
+                future.cancel()
+                raise TimeoutError(
+                    f"Step {step.name!r} timed out after {step.timeout_s}s"
+                )
 
     def _execute_step(self, step: PipelineStep, context: dict[str, Any]) -> Any:
         """Execute a single step, resolving tool or inline handler.

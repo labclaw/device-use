@@ -467,3 +467,125 @@ class TestParallelPipeline:
         # The "never" step should not have run
         step_names = [name for name, _ in result.steps]
         assert "never" not in step_names
+
+
+# ── Retry & Timeout ─────────────────────────────────────────
+
+class TestRetryAndTimeout:
+    def test_retry_succeeds_on_second_attempt(self):
+        """Step fails first, then succeeds — retries save it."""
+        orch = Orchestrator()
+        call_count = [0]
+
+        def flaky(ctx):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise ConnectionError("instrument busy")
+            return "ok"
+
+        pipeline = Pipeline("retry_test")
+        pipeline.add_step(PipelineStep(
+            name="flaky_step",
+            handler=flaky,
+            retries=2,
+        ))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert result.outputs["flaky_step"] == "ok"
+        assert call_count[0] == 2
+
+    def test_retry_exhausted(self):
+        """Step fails all attempts — pipeline fails."""
+        orch = Orchestrator()
+
+        pipeline = Pipeline("retry_exhausted")
+        pipeline.add_step(PipelineStep(
+            name="always_fail",
+            handler=lambda ctx: 1 / 0,
+            retries=2,
+        ))
+
+        result = orch.run(pipeline)
+        assert not result.success
+        assert result.steps[0][1].status == StepStatus.FAILED
+        assert "division by zero" in result.steps[0][1].error
+
+    def test_retry_events(self):
+        """Retry attempts are counted in events."""
+        events = []
+        orch = Orchestrator()
+        orch.on_event(lambda e: events.append(e))
+        call_count = [0]
+
+        def fail_once(ctx):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise RuntimeError("oops")
+            return "recovered"
+
+        pipeline = Pipeline("retry_events")
+        pipeline.add_step(PipelineStep(
+            name="s", handler=fail_once, retries=1,
+        ))
+        orch.run(pipeline)
+
+        end_events = [e for e in events if e.event_type == EventType.STEP_END]
+        assert len(end_events) == 1
+        assert end_events[0].data["attempts"] == 2
+
+    def test_timeout_enforced(self):
+        """Step that exceeds timeout_s is killed."""
+        import time as _time
+        orch = Orchestrator()
+
+        pipeline = Pipeline("timeout_test")
+        pipeline.add_step(PipelineStep(
+            name="slow",
+            handler=lambda ctx: (_time.sleep(5), "done")[1],
+            timeout_s=0.1,
+        ))
+
+        result = orch.run(pipeline)
+        assert not result.success
+        assert result.steps[0][1].status == StepStatus.FAILED
+        assert "timed out" in result.steps[0][1].error
+
+    def test_timeout_not_triggered(self):
+        """Step finishes before timeout — succeeds normally."""
+        orch = Orchestrator()
+
+        pipeline = Pipeline("timeout_ok")
+        pipeline.add_step(PipelineStep(
+            name="fast",
+            handler=lambda ctx: "quick",
+            timeout_s=5.0,
+        ))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert result.outputs["fast"] == "quick"
+
+    def test_retry_with_timeout(self):
+        """Retry + timeout together: each attempt gets its own timeout."""
+        import time as _time
+        orch = Orchestrator()
+        call_count = [0]
+
+        def slow_then_fast(ctx):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                _time.sleep(5)  # will timeout
+            return "recovered"
+
+        pipeline = Pipeline("retry_timeout")
+        pipeline.add_step(PipelineStep(
+            name="combo",
+            handler=slow_then_fast,
+            retries=1,
+            timeout_s=0.1,
+        ))
+
+        result = orch.run(pipeline)
+        assert result.success
+        assert result.outputs["combo"] == "recovered"
