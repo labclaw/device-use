@@ -432,6 +432,20 @@ class TestMapCUAction:
         action = parse_action(result["action"])
         assert action.clicks == 0
 
+    def test_scroll_negative_truncation(self):
+        """Regression: -121 // 120 = -2 (floor), but int(-121/120) = -1 (truncate)."""
+        cu = {"action_type": "scroll", "x": 0, "y": 0, "scroll_x": 0, "scroll_y": -121}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert action.clicks == -1  # truncate toward zero, not floor
+
+    def test_scroll_positive_truncation(self):
+        """Positive scroll_y=121 should also truncate to 1, not round up."""
+        cu = {"action_type": "scroll", "x": 0, "y": 0, "scroll_x": 0, "scroll_y": 121}
+        result = OpenAICompatBackend._map_cu_action(cu)
+        action = parse_action(result["action"])
+        assert action.clicks == 1
+
     def test_drag(self):
         cu = {
             "action_type": "drag",

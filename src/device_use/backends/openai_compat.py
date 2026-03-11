@@ -438,7 +438,7 @@ class OpenAICompatBackend:
             # Map scroll_y to clicks: negative scroll_y = scroll down = negative clicks,
             # positive scroll_y = scroll up = positive clicks.
             # GPT-5.4 uses pixel deltas; convert to discrete clicks (120px per click).
-            action["clicks"] = scroll_y // 120 if abs(scroll_y) >= 120 else (
+            action["clicks"] = int(scroll_y / 120) if abs(scroll_y) >= 120 else (
                 -1 if scroll_y < 0 else (1 if scroll_y > 0 else 0)
             )
         elif action_type == "drag":
