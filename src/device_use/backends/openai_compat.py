@@ -447,10 +447,22 @@ class OpenAICompatBackend:
             if len(path) >= 2:
                 start = path[0]
                 end = path[-1]
-                action["start_x"] = start.get("x", 0) if isinstance(start, dict) else getattr(start, "x", 0)
-                action["start_y"] = start.get("y", 0) if isinstance(start, dict) else getattr(start, "y", 0)
-                action["end_x"] = end.get("x", 0) if isinstance(end, dict) else getattr(end, "x", 0)
-                action["end_y"] = end.get("y", 0) if isinstance(end, dict) else getattr(end, "y", 0)
+                action["start_x"] = (
+                    start.get("x", 0) if isinstance(start, dict)
+                    else getattr(start, "x", 0)
+                )
+                action["start_y"] = (
+                    start.get("y", 0) if isinstance(start, dict)
+                    else getattr(start, "y", 0)
+                )
+                action["end_x"] = (
+                    end.get("x", 0) if isinstance(end, dict)
+                    else getattr(end, "x", 0)
+                )
+                action["end_y"] = (
+                    end.get("y", 0) if isinstance(end, dict)
+                    else getattr(end, "y", 0)
+                )
             else:
                 # Fallback: no valid path, use zero coordinates
                 action["start_x"] = 0
