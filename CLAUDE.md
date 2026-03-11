@@ -50,21 +50,27 @@ src/device_use/
     app.py                 # FastAPI web GUI (port 8420)
 
 demos/
-  quickstart.py                 # One-line setup, no API key needed
-  topspin_identify.py           # Single compound identification
-  topspin_dnmr.py               # Dynamic NMR temperature series
-  topspin_batch.py              # Batch analysis + PubChem
-  topspin_blind_challenge.py    # Blind NMR identification quiz
-  topspin_ai_scientist.py       # Full AI scientist pipeline (flagship)
-  topspin_pipeline.py           # Orchestrator middleware demo
-  topspin_compare.py            # Side-by-side spectral comparison
-  multi_instrument_demo.py      # NMR + Plate Reader together
-  lab_report_demo.py            # Raw data → paper-ready report
-  streaming_demo.py             # Real-time event stream
-  topspin_reaction_monitor.py   # Autonomous reaction monitoring
-  topspin_library.py            # Spectral library fingerprint matching
-  benchmark.py                  # Performance benchmark
-  showcase.py                   # All features in one script (pitch demo)
+  lib/
+    __init__.py                 # Shared demo infrastructure
+    terminal.py                 # ANSI color constants + formatting helpers
+    runner.py                   # DemoRunner: shared argparse + connection
+    recorder.py                 # DemoRecorder: screenshots + GIF assembly
+  01_quickstart.py              # One-line setup, no API key needed
+  02_identify.py                # Single compound identification
+  03_batch.py                   # Batch analysis + PubChem
+  04_dnmr.py                    # Dynamic NMR temperature series
+  05_blind_challenge.py         # Blind NMR identification quiz
+  06_ai_scientist.py            # Full AI scientist pipeline (flagship)
+  07_gui_live.py                # Live GUI operation of TopSpin (showstopper)
+  08_pipeline.py                # Orchestrator middleware demo
+  09_multi_instrument.py        # NMR + Plate Reader together
+  10_lab_report.py              # Raw data → paper-ready report
+  11_reaction_monitor.py        # Autonomous reaction monitoring
+  12_streaming.py               # Real-time event stream
+  13_compare.py                 # Side-by-side spectral comparison
+  14_library.py                 # Spectral library fingerprint matching
+  15_showcase.py                # All features in one script (pitch demo)
+  16_benchmark.py               # Performance benchmark
 
 tests/
   test_nmr.py              # NMR module tests
