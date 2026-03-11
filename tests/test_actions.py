@@ -1,4 +1,4 @@
-"""Tests for action models, coordinate scaling, executor, and registry."""
+"""Tests for action models, coordinate scaling, and executor."""
 
 from unittest.mock import MagicMock, patch
 
@@ -17,7 +17,6 @@ from device_use.actions.models import (
 )
 from device_use.actions.scaling import CoordinateScaler
 from device_use.actions.executor import ActionExecutor
-from device_use.actions.registry import get_handler, list_registered, register_handler
 from device_use.core.models import ActionType
 
 
@@ -313,28 +312,3 @@ class TestActionExecutor:
         request = mock_guard.check.call_args[0][0]
         assert request.coordinates == (200, 200)  # 100*2 = 200
 
-
-# --- Registry ---
-
-
-class TestRegistry:
-    def test_register_and_get(self):
-        @register_handler(ActionType.SCREENSHOT)
-        def handle_screenshot(action):
-            pass
-
-        handler = get_handler(ActionType.SCREENSHOT)
-        assert handler is handle_screenshot
-        assert ActionType.SCREENSHOT in list_registered()
-
-    def test_get_unregistered_raises(self):
-        # Use an action type that's not registered in this test
-        # Clear any previous registration first
-        from device_use.actions.registry import _ACTION_HANDLERS
-        saved = _ACTION_HANDLERS.pop(ActionType.DRAG, None)
-        try:
-            with pytest.raises(ValueError, match="No handler"):
-                get_handler(ActionType.DRAG)
-        finally:
-            if saved is not None:
-                _ACTION_HANDLERS[ActionType.DRAG] = saved
