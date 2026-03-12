@@ -186,6 +186,7 @@ def click_at(x: float, y: float) -> None:
     except FileNotFoundError:
         # Fallback to pyautogui
         import pyautogui
+        pyautogui.FAILSAFE = False
         pyautogui.click(int(x), int(y))
 
 
@@ -302,6 +303,7 @@ def dismiss_internal_dialogs(op: AccessibilityOperator) -> None:
     click elsewhere in the spectrum display area.
     """
     import pyautogui
+    pyautogui.FAILSAFE = False
 
     focus_topspin()
 
