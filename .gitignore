@@ -35,4 +35,9 @@ Agent-S/
 UFO/
 output/
 .claude/
+
+# Runtime artifacts
+history_j.txt
+log/
+null/
 spectrum.png
