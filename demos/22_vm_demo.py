@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
-"""AI operates TopSpin in Tart VM via CUA REST API.
+"""AI operates TopSpin in Tart VM via VNC + Sonnet 4.6.
 
-Uses cua-computer-server running in the VM for screenshots and input.
+Uses vncdo CLI for screenshots, mouse clicks, and keyboard input (ARD auth).
+CUA REST API is used only for shell commands (launching apps, killing processes).
+CUA keyboard/mouse don't work for Java/Swing apps on macOS VMs.
+
 Sonnet 4.6 (via OpenRouter) verifies each step via screenshot analysis.
 Each frame is pushed to labwork-web as MJPEG stream for live viewing.
 
-CUA Server API (SSE responses, prefix "data: "):
-  POST http://<VM_IP>:8000/cmd
-    {"command": "screenshot"}                         -> {"image_data": "<b64>"}
-    {"command": "left_click", "params": {"x":N,"y":N}} -> {"success": true}
-    {"command": "type_text", "params": {"text":"..."}}  -> {"success": true}
-    {"command": "press_key", "params": {"key":"..."}}   -> {"success": true}
-    {"command": "hotkey", "params": {"keys":["cmd","a"]}} -> {"success": true}
-    {"command": "run_command", "params": {"command":"..."}} -> {"stdout":...}
+Framebuffer: 2048x1536 (retina @2x for 1024x768 VM display).
+VNC mouse input is in framebuffer coords (2048x1536).
 
 Usage:
-    # 1. Start VM:   tart run topspin-sequoia &
-    # 2. Start CUA:  ssh admin@<IP> 'cua-computer-server &'
-    # 3. Start web:  cd labwork-web && uvicorn app:app --port 8430
-    # 4. Run demo:   python demos/22_vm_demo.py
-    # 5. Watch:      open http://localhost:8430 -> Live VM tab
+    # 1. Start VM:    tart run topspin-sequoia --no-graphics --vnc-experimental &
+    # 2. Start CUA:   (on VM) cua-computer-server &
+    # 3. Start web:   cd labwork-web && uvicorn app:app --port 8430
+    # 4. Run demo:    python demos/22_vm_demo.py
+    # 5. Watch:       open http://localhost:8430 -> Live VM tab
 """
 from __future__ import annotations
 
@@ -28,15 +25,19 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 
 import httpx
 from openai import OpenAI
+from PIL import Image
 
 # ── Config ──────────────────────────────────────
 VM_IP = os.environ.get("VM_IP", "192.168.64.13")
-CUA_URL = f"http://{VM_IP}:8000/cmd"
+VNC_USER = os.environ.get("VNC_USER", "admin")
+VNC_PASS = os.environ.get("VNC_PASS", "admin")
+CUA_URL = f"http://{VM_IP}:8000/cmd"  # For run_command only
 MODEL = "anthropic/claude-sonnet-4.6"
 LABWORK_URL = os.environ.get("LABWORK_URL", "http://localhost:8430")
 DATASET = os.environ.get(
@@ -44,8 +45,8 @@ DATASET = os.environ.get(
     "/opt/topspin5.0.0/examdata/exam_CMCse_1/1",
 )
 
-# TopSpin command line position (logical coords for 1024x768 display)
-CMD_X, CMD_Y = 100, 689
+# TopSpin command line position (framebuffer coords, 2048x1536)
+CMD_X, CMD_Y = 200, 960
 
 B = "\033[1m"
 G = "\033[32m"
@@ -56,64 +57,90 @@ Y = "\033[33m"
 RST = "\033[0m"
 
 
-# ── CUA REST helpers ────────────────────────────
+# ── VNC helpers (via vncdo CLI) ─────────────────
 
-def cua_cmd(command: str, params: dict | None = None) -> dict:
-    """Send a command to the CUA server, return parsed response."""
+def _vncdo(*args: str, timeout: int = 15) -> subprocess.CompletedProcess:
+    """Run vncdo command with ARD auth credentials."""
+    cmd = [
+        sys.executable.replace("python", "vncdo").replace(
+            "bin/python", "bin/vncdo",
+        ),
+        "-s", VM_IP,
+        "--username", VNC_USER,
+        "--password", VNC_PASS,
+        *args,
+    ]
+    # Fallback: find vncdo next to python
+    if not os.path.exists(cmd[0]):
+        venv_bin = os.path.dirname(sys.executable)
+        cmd[0] = os.path.join(venv_bin, "vncdo")
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+
+
+def vnc_screenshot(path: str = "/tmp/vnc_frame.png") -> Image.Image:
+    """Take a VNC screenshot, return PIL Image."""
+    _vncdo("capture", path)
+    return Image.open(path)
+
+
+def vnc_click(x: int, y: int) -> None:
+    """Click at framebuffer coordinates (2048x1536)."""
+    _vncdo("move", str(x), str(y), "pause", "0.1", "click", "1")
+
+
+def vnc_type_text(text: str) -> None:
+    """Type text character by character via VNC."""
+    _vncdo("type", text)
+
+
+def vnc_key(key: str) -> None:
+    """Press a named key: return, tab, esc, bsp, space, etc."""
+    _vncdo("key", key)
+
+
+def vnc_type_command(cmd: str) -> None:
+    """Triple-click TopSpin command line, type command, press Return.
+
+    All input goes through VNC (mouse clicks, typing, Return key).
+    CUA keyboard doesn't reach Java/Swing apps in macOS VMs.
+    """
+    # Triple-click to select all text in command line, then type + Return
+    _vncdo(
+        "move", str(CMD_X), str(CMD_Y),
+        "pause", "0.2",
+        "click", "1",
+        "pause", "0.05",
+        "click", "1",
+        "pause", "0.05",
+        "click", "1",
+        "pause", "0.3",
+        "type", cmd,
+        "pause", "0.3",
+        "key", "return",
+    )
+
+
+# ── CUA helpers (shell commands only) ─────────────
+#
+# CUA keyboard/mouse don't reach Java/Swing apps in macOS VMs.
+# We only use CUA for run_command (launching apps, killing processes).
+
+def _cua_cmd(command: str, params: dict | None = None) -> dict:
+    """Send a command to CUA server, return parsed response."""
     body: dict = {"command": command}
     if params:
         body["params"] = params
     resp = httpx.post(CUA_URL, json=body, timeout=30)
-    text = resp.text.strip()
-    # SSE format: strip "data: " prefix
-    if text.startswith("data: "):
-        text = text[6:]
-    return json.loads(text)
-
-
-def cua_screenshot() -> tuple[str, bytes]:
-    """Take screenshot via CUA, return (base64_str, png_bytes)."""
-    result = cua_cmd("screenshot")
-    if not result.get("success"):
-        raise RuntimeError(f"Screenshot failed: {result.get('error')}")
-    b64 = result["image_data"]
-    return b64, base64.b64decode(b64)
-
-
-def cua_click(x: int, y: int) -> None:
-    """Click at logical coordinates."""
-    cua_cmd("left_click", {"x": x, "y": y})
-
-
-def cua_type(text: str) -> None:
-    """Type text."""
-    cua_cmd("type_text", {"text": text})
-
-
-def cua_key(key: str) -> None:
-    """Press a single key."""
-    cua_cmd("press_key", {"key": key})
-
-
-def cua_hotkey(keys: list[str]) -> None:
-    """Press a key combination."""
-    cua_cmd("hotkey", {"keys": keys})
+    # CUA returns SSE format: "data: {...}"
+    for line in resp.text.strip().splitlines():
+        if line.startswith("data: "):
+            return json.loads(line[6:])
+    return json.loads(resp.text.strip())
 
 
 def cua_run(command: str) -> dict:
-    """Run a shell command in the VM."""
-    return cua_cmd("run_command", {"command": command})
-
-
-def cua_type_command(cmd: str) -> None:
-    """Click TopSpin command line, select all, type command, press Return."""
-    cua_click(CMD_X, CMD_Y)
-    time.sleep(0.3)
-    cua_hotkey(["command", "a"])
-    time.sleep(0.1)
-    cua_type(cmd)
-    time.sleep(0.2)
-    cua_key("return")
+    """Run a shell command in the VM via CUA REST API."""
+    return _cua_cmd("run_command", {"command": command})
 
 
 # ── Stream helpers ──────────────────────────────
@@ -144,20 +171,20 @@ def push_log(text: str, status: str | None = None) -> None:
 
 
 def screenshot_and_push() -> tuple[str, bytes]:
-    """Take screenshot, push JPEG to stream, return (base64, png_bytes)."""
-    b64, png_bytes = cua_screenshot()
+    """Take VNC screenshot, resize, push JPEG, return (b64, png_bytes)."""
+    img = vnc_screenshot()
 
-    # Convert to JPEG for stream
-    try:
-        from PIL import Image
+    # Push JPEG for live stream
+    buf_jpg = io.BytesIO()
+    img.convert("RGB").save(buf_jpg, format="JPEG", quality=75)
+    push_frame(buf_jpg.getvalue())
 
-        img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=75)
-        push_frame(buf.getvalue())
-    except ImportError:
-        pass  # PIL not available — skip streaming
-
+    # Resize to 1280x960 for VLM (under 5MB limit)
+    img_small = img.convert("RGB").resize((1280, 960), Image.LANCZOS)
+    buf_png = io.BytesIO()
+    img_small.save(buf_png, format="PNG", optimize=True)
+    png_bytes = buf_png.getvalue()
+    b64 = base64.b64encode(png_bytes).decode("ascii")
     return b64, png_bytes
 
 
@@ -180,10 +207,9 @@ def ask_sonnet(client: OpenAI, screenshot_b64: str, question: str) -> str:
                 {
                     "type": "text",
                     "text": (
-                        "This is a 2048x1536 pixel screenshot of macOS with "
-                        "Bruker TopSpin 5.0.\n"
+                        "This is a 1280x960 screenshot of macOS with "
+                        "Bruker TopSpin 5.0 NMR software.\n"
                         f"{question}\n\n"
-                        "Coordinates are in LOGICAL space (1024x768). "
                         "Return ONLY JSON, no markdown fences."
                     ),
                 },
@@ -196,7 +222,7 @@ def ask_sonnet(client: OpenAI, screenshot_b64: str, question: str) -> str:
 def ask_verify(
     client: OpenAI, screenshot_b64: str, check: str,
 ) -> dict:
-    """Ask Sonnet to verify a condition. Returns {"ok": bool, "description": str}."""
+    """Ask Sonnet to verify a condition."""
     text = ask_sonnet(
         client, screenshot_b64,
         f'{check}\nReturn: {{"ok": true/false, "description": "what you see"}}',
@@ -210,82 +236,40 @@ def ask_verify(
     return {"ok": False, "description": text[:200]}
 
 
-def ask_coords(
-    client: OpenAI, screenshot_b64: str, target: str,
-) -> tuple[int, int] | None:
-    """Ask Sonnet for coordinates of a UI element."""
-    text = ask_sonnet(
-        client, screenshot_b64,
-        f'Find the "{target}" button/element. '
-        f'Return: {{"x": N, "y": N}}',
-    )
-    mx = re.search(r'"x"\s*:\s*(\d+)', text)
-    my = re.search(r'"y"\s*:\s*(\d+)', text)
-    if mx and my:
-        return int(mx.group(1)), int(my.group(1))
-    return None
-
-
 # ── Pipeline Steps ──────────────────────────────
 
-def step_open_topspin(ai: OpenAI) -> bool:
+def step_ensure_topspin(ai: OpenAI) -> bool:
     """Ensure TopSpin is open and visible."""
-    push_log(">>> Open TopSpin", status="operating")
+    push_log(">>> Ensure TopSpin visible", status="operating")
+
+    # Kill any stale notification dialogs
+    cua_run("pkill -9 UserNotificationCenter 2>/dev/null")
 
     b64, _ = screenshot_and_push()
     result = ask_verify(
         ai, b64,
-        "Is Bruker TopSpin 5.0 open and visible? "
-        "Look for the TopSpin window with toolbar, spectrum area, "
-        "and command line.",
+        "Is Bruker TopSpin 5.0 open with its main window visible? "
+        "Look for the TopSpin toolbar, spectrum area, and command line.",
     )
     if result.get("ok"):
-        push_log(f"  OK TopSpin already open: {result.get('description', '')}")
+        push_log(f"  OK TopSpin visible: {result.get('description', '')}")
         return True
 
-    # Activate via SSH osascript
-    push_log("  TopSpin not visible, activating...")
-    cua_run(
-        "osascript -e 'tell application \"TopSpin 5.0.0\" to activate'"
-    )
-    time.sleep(5)
+    # TopSpin not visible -- try launching it
+    push_log("  TopSpin not visible, launching...")
+    cua_run("pkill -9 java 2>/dev/null")
+    time.sleep(3)
+    cua_run('open "/Applications/TopSpin 5.0.0.app"')
+    time.sleep(45)  # TopSpin takes ~30-40s to start in VM
 
-    b64, _ = screenshot_and_push()
-    result = ask_verify(ai, b64, "Is TopSpin now visible?")
-    if result.get("ok"):
-        push_log("  OK TopSpin activated")
-        return True
-
-    # Try opening directly
-    push_log("  Launching TopSpin app...")
-    cua_run("open -a '/Applications/TopSpin 5.0.0.app'")
-    time.sleep(15)
-
-    # Dismiss any license/error dialogs
-    for _ in range(3):
-        b64, _ = screenshot_and_push()
-        dlg = ask_verify(
-            ai, b64,
-            "Is there a dialog/popup with Close/OK/Cancel/Accept buttons? "
-            "Set ok=true if yes.",
-        )
-        if not dlg.get("ok"):
-            break
-        desc = dlg.get("description", "")
-        push_log(f"  Dismissing dialog: {desc[:60]}")
-        if "license" in desc.lower() or "accept" in desc.lower():
-            coords = ask_coords(ai, b64, "'I Accept' or 'Accept' button")
-            if coords:
-                cua_click(coords[0], coords[1])
-                time.sleep(3)
-                continue
-        cua_key("return")
-        time.sleep(2)
+    # Kill notification dialogs that appear during startup
+    cua_run("pkill -9 UserNotificationCenter 2>/dev/null")
+    time.sleep(3)
 
     b64, _ = screenshot_and_push()
     result = ask_verify(ai, b64, "Is TopSpin now visible?")
     ok = result.get("ok", False)
-    push_log(f"  {'OK' if ok else 'FAIL'} TopSpin: {result.get('description', '')}")
+    push_log(f"  {'OK' if ok else 'FAIL'} {result.get('description', '')}")
     return ok
 
 
@@ -293,13 +277,13 @@ def step_load_dataset(ai: OpenAI) -> bool:
     """Load NMR dataset using 're' command."""
     push_log(">>> Load Dataset", status="operating")
 
-    cua_type_command(f"re {DATASET}")
+    vnc_type_command(f"re {DATASET}")
     time.sleep(5)
 
     b64, _ = screenshot_and_push()
     result = ask_verify(
         ai, b64,
-        "Has NMR data been loaded? Look for: a spectrum plot "
+        "Has NMR data been loaded? Look for a spectrum plot "
         "(FID or frequency domain) in the main panel, OR dataset "
         "info in the title area.",
     )
@@ -308,14 +292,14 @@ def step_load_dataset(ai: OpenAI) -> bool:
         return True
 
     # Retry with longer wait
-    push_log("  Waiting longer for dataset...")
+    push_log("  Waiting longer...")
     time.sleep(5)
     b64, _ = screenshot_and_push()
     result = ask_verify(
         ai, b64, "Is there ANY spectrum or data displayed in TopSpin?",
     )
     ok = result.get("ok", False)
-    push_log(f"  {'OK' if ok else 'WARN'} Retry: {result.get('description', '')}")
+    push_log(f"  {'OK' if ok else 'WARN'} {result.get('description', '')}")
     return ok
 
 
@@ -329,7 +313,7 @@ def step_run_command(
     """Run a TopSpin command and verify the result."""
     push_log(f">>> {step_name}", status="operating")
 
-    cua_type_command(cmd)
+    vnc_type_command(cmd)
     time.sleep(3)
 
     b64, _ = screenshot_and_push()
@@ -345,10 +329,9 @@ def step_run_command(
             if not dlg.get("ok"):
                 break
             push_log(f"  Dialog: {dlg.get('description', '')[:60]}")
-            cua_key("return")
+            vnc_key("return")
             time.sleep(3)
             b64, _ = screenshot_and_push()
-            push_log("  Accepted dialog with Return")
 
     result = ask_verify(ai, b64, verify_prompt)
     ok = result.get("ok", False)
@@ -382,8 +365,8 @@ def step_verify_result(ai: OpenAI) -> bool:
 def main() -> int:
     print(
         f"\n{B}{'=' * 55}{RST}\n"
-        f"{B}  AI NMR Experiment -- CUA + Sonnet 4.6{RST}\n"
-        f"{D}  VM: {VM_IP}  |  CUA: {CUA_URL}{RST}\n"
+        f"{B}  AI NMR Experiment -- VNC + Sonnet 4.6{RST}\n"
+        f"{D}  VM: {VM_IP}  |  VNC: {VM_IP}:5900{RST}\n"
         f"{D}  Watch at {LABWORK_URL} -> Live VM tab{RST}\n"
         f"{B}{'=' * 55}{RST}\n"
     )
@@ -406,33 +389,29 @@ def main() -> int:
 
     ai = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
 
-    # Verify CUA server
-    print("  Testing CUA connection...")
+    # Test VNC connection
+    print("  Testing VNC connection...")
     try:
-        result = cua_cmd("get_screen_size")
-        size = result.get("size", {})
-        print(
-            f"  {G}OK CUA: {size.get('width')}x{size.get('height')}{RST}",
-        )
+        img = vnc_screenshot()
+        print(f"  {G}OK VNC: {img.size[0]}x{img.size[1]}{RST}")
     except Exception as e:
-        print(f"  {R}FAIL CUA connection failed: {e}{RST}")
+        print(f"  {R}FAIL VNC: {e}{RST}")
         return 1
 
-    # Take initial screenshot
-    push_log("Taking initial screenshot...", status="connecting")
-    b64, png = screenshot_and_push()
-    print(f"  {G}OK Screenshot: {len(png) // 1024}KB{RST}")
+    # Kill stale notification dialogs from previous sessions
+    try:
+        cua_run("pkill -9 UserNotificationCenter 2>/dev/null")
+    except Exception:
+        pass  # CUA server might not be running
 
-    # Save locally for inspection
-    with open("/tmp/cua_vm_initial.png", "wb") as f:
-        f.write(png)
+    push_log("Starting pipeline...", status="connecting")
 
     # ── Pipeline ──
     t_total = time.monotonic()
     results: list[tuple[str, bool]] = []
 
-    # Step 1: Open TopSpin
-    ok = step_open_topspin(ai)
+    # Step 1: Ensure TopSpin visible
+    ok = step_ensure_topspin(ai)
     results.append(("Open TopSpin", ok))
     if not ok:
         push_log("FAIL Critical: TopSpin not available", status="done")
@@ -492,9 +471,7 @@ def main() -> int:
     results.append(("Verify Result", ok))
 
     # Save final screenshot
-    _, final_png = screenshot_and_push()
-    with open("/tmp/cua_vm_final.png", "wb") as f:
-        f.write(final_png)
+    vnc_screenshot("/tmp/vm_demo_final.png")
 
     # Summary
     dt = time.monotonic() - t_total
@@ -510,7 +487,7 @@ def main() -> int:
         print(f"  {status} {name}")
     print(f"{B}{'=' * 55}{RST}")
     print(f"{B}{summary}{RST}")
-    print(f"{D}Screenshots: /tmp/cua_vm_initial.png, /tmp/cua_vm_final.png{RST}\n")
+    print(f"{D}Final screenshot: /tmp/vm_demo_final.png{RST}\n")
     return 0 if passed == total else 1
 
 
