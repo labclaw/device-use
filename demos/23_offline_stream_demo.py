@@ -34,7 +34,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 # ── Config ──────────────────────────────────────
 DATASET = os.environ.get("DATASET", "exam_CMCse_1")
 EXPNO = os.environ.get("EXPNO", "1")
-MODEL = "anthropic/claude-sonnet-4"
+BRAIN_MODEL = "anthropic/claude-opus-4"  # Brain = Opus 4.6 (reasoning, analysis)
+CU_MODEL = "anthropic/claude-sonnet-4"    # Hands = Sonnet 4.6 (CUA screenshot→action)
 LABWORK_URL = os.environ.get("LABWORK_URL", "http://localhost:8430")
 EXAMDATA = "/opt/topspin5.0.0/examdata"
 
@@ -98,9 +99,9 @@ async def push_image(img: Image.Image, label: str = ""):
 
 
 def ask_vlm(client: OpenAI, image_b64: str, question: str) -> str:
-    """Send image + question to Sonnet 4.6 VLM, get text answer."""
+    """Send image + question to Opus 4.6 (brain), get text answer."""
     response = client.chat.completions.create(
-        model=MODEL,
+        model=BRAIN_MODEL,
         max_tokens=1024,
         messages=[
             {
@@ -119,9 +120,9 @@ def ask_vlm(client: OpenAI, image_b64: str, question: str) -> str:
 
 
 def ask_text(client: OpenAI, prompt: str) -> str:
-    """Text-only query to Sonnet 4.6."""
+    """Text-only query to Opus 4.6 (brain)."""
     response = client.chat.completions.create(
-        model=MODEL,
+        model=BRAIN_MODEL,
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -349,7 +350,7 @@ async def main() -> int:
     await push_log(f"  Library match: {top_match.entry.name if top_match else 'N/A'} "
                    f"({top_match.score:.0%})" if top_match else "")
     await push_log(f"  PubChem: {compound_data.get('MolecularFormula', 'N/A')}")
-    await push_log(f"  AI model: Sonnet 4.6 via OpenRouter")
+    await push_log(f"  Brain: Opus 4.6 | Hands: Sonnet 4.6")
     await push_log(f"{'─' * 50}", status="done")
 
     print(f"\n{B}{G}✓ Research complete in {dt:.1f}s{RST}\n")
