@@ -34,8 +34,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 # ── Config ──────────────────────────────────────
 DATASET = os.environ.get("DATASET", "exam_CMCse_1")
 EXPNO = os.environ.get("EXPNO", "1")
-BRAIN_MODEL = "anthropic/claude-opus-4"  # Brain = Opus 4.6 (reasoning, analysis)
-CU_MODEL = "anthropic/claude-sonnet-4"    # Hands = Sonnet 4.6 (CUA screenshot→action)
+BRAIN_MODEL = "anthropic/claude-opus-4.6"   # Brain = Opus 4.6 (reasoning, analysis)
+CU_MODEL = "anthropic/claude-sonnet-4.6"   # Hands = Sonnet 4.6 (CUA screenshot→action)
 LABWORK_URL = os.environ.get("LABWORK_URL", "http://localhost:8430")
 EXAMDATA = "/opt/topspin5.0.0/examdata"
 

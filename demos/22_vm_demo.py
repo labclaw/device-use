@@ -27,7 +27,7 @@ from openai import OpenAI
 # ── Config ──────────────────────────────────────
 VM_NAME = os.environ.get("VM_NAME", "topspin-vm")
 DATASET = "/opt/topspin5.0.0/examdata/exam_CMCse_1/1"
-MODEL = "anthropic/claude-sonnet-4"  # Sonnet = CUA hands (screenshot→action only)
+MODEL = "anthropic/claude-sonnet-4.6"  # Sonnet 4.6 = CUA hands (screenshot→action only)
 LABWORK_URL = os.environ.get("LABWORK_URL", "http://localhost:8430")
 
 B = "\033[1m"
