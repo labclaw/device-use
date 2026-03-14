@@ -183,5 +183,5 @@ class TestCreatePlugin:
 
 async def _mock_capture() -> bytes:
     """Return a minimal valid PNG for testing."""
-    from conftest import _create_minimal_png
+    from .conftest import _create_minimal_png
     return _create_minimal_png()
