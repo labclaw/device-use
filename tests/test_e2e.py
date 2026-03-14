@@ -6,8 +6,10 @@ No real instruments, API keys, or display required.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -16,6 +18,8 @@ from device_use import DeviceProfile, load_profile, list_profiles
 from device_use.core.agent import DeviceAgent
 from device_use.core.result import AgentResult
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -23,8 +27,16 @@ from device_use.core.result import AgentResult
 
 
 async def _mock_capture() -> bytes:
-    from conftest import _create_minimal_png
+    from .conftest import _create_minimal_png
     return _create_minimal_png()
+
+
+def _cli_env() -> dict[str, str]:
+    env = os.environ.copy()
+    src_path = str(REPO_ROOT / "src")
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = f"{src_path}{os.pathsep}{existing}" if existing else src_path
+    return env
 
 
 class MockBackend:
@@ -290,6 +302,8 @@ class TestCLI:
             capture_output=True,
             text=True,
             timeout=30,
+            cwd=REPO_ROOT,
+            env=_cli_env(),
         )
         assert result.returncode == 0
         output = result.stdout
@@ -310,6 +324,8 @@ class TestCLI:
             capture_output=True,
             text=True,
             timeout=30,
+            cwd=REPO_ROOT,
+            env=_cli_env(),
         )
         assert result.returncode == 0
         assert "GUI agent for scientific instruments" in result.stdout
@@ -321,6 +337,8 @@ class TestCLI:
             capture_output=True,
             text=True,
             timeout=30,
+            cwd=REPO_ROOT,
+            env=_cli_env(),
         )
         assert result.returncode != 0
         assert "profile" in result.stderr.lower()
