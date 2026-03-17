@@ -1,4 +1,7 @@
-"""Additional NMR module coverage tests — adapter, brain, gui_automation, processor, demo_cache, visualizer, library."""
+"""Additional NMR module coverage tests.
+
+Covers adapter, brain, gui_automation, processor, demo_cache, visualizer, library.
+"""
 
 from __future__ import annotations
 
@@ -111,7 +114,7 @@ class TestTopSpinAdapterModes:
         adapter._dp = MagicMock()
         mock_spectrum = MagicMock()
         with patch.object(adapter, "_process_via_nmrglue", return_value=mock_spectrum):
-            result = adapter._process_via_api("some_path")
+            adapter._process_via_api("some_path")
             adapter._dp.getNMRData.assert_called_once_with("some_path")
 
     def test_process_dataset_gui_mode(self, tmp_path):
@@ -120,7 +123,7 @@ class TestTopSpinAdapterModes:
         adapter._gui = MagicMock()
         mock_spectrum = MagicMock()
         with patch.object(adapter, "_process_via_nmrglue", return_value=mock_spectrum):
-            result = adapter._process_via_gui("path")
+            adapter._process_via_gui("path")
             adapter._gui.open_dataset.assert_called_once_with("path")
 
     def test_process_dataset_gui_with_callback(self, tmp_path):
@@ -356,7 +359,7 @@ class TestTopSpinGUIAutomation:
             gui = TopSpinGUIAutomation()
         with (
             patch("platform.system", return_value="Linux"),
-            patch("subprocess.run") as mock_run,
+            patch("subprocess.run"),
             patch("pathlib.Path.read_bytes", return_value=b"PNG_DATA"),
             patch("pathlib.Path.unlink"),
         ):
