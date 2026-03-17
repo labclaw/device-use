@@ -76,7 +76,7 @@ class TestRun:
         )
         with (
             patch("device_use.profiles.loader.load_profile") as mock_load,
-            patch("device_use.cli._create_backend") as mock_backend,
+            patch("device_use.cli._create_backend") as _mock_backend,
             patch("device_use.core.agent.DeviceAgent") as mock_agent_cls,
         ):
             mock_profile = MagicMock()
@@ -100,7 +100,7 @@ class TestRun:
         )
         with (
             patch("device_use.profiles.loader.load_profile") as mock_load,
-            patch("device_use.cli._create_backend") as mock_backend,
+            patch("device_use.cli._create_backend") as _mock_backend,
             patch("device_use.core.agent.DeviceAgent") as mock_agent_cls,
         ):
             mock_profile = MagicMock()
@@ -126,7 +126,7 @@ class TestInteractive:
         args = MagicMock(profile="imagej-fiji", backend="claude", model=None)
         with (
             patch("device_use.profiles.loader.load_profile") as mock_load,
-            patch("device_use.cli._create_backend") as mock_backend,
+            patch("device_use.cli._create_backend") as _mock_backend,
             patch("builtins.input", side_effect=["quit"]),
         ):
             mock_load.return_value = MagicMock(name="test")
@@ -140,7 +140,7 @@ class TestInteractive:
         args = MagicMock(profile="imagej-fiji", backend="claude", model=None)
         with (
             patch("device_use.profiles.loader.load_profile") as mock_load,
-            patch("device_use.cli._create_backend") as mock_backend,
+            patch("device_use.cli._create_backend") as _mock_backend,
             patch("builtins.input", side_effect=EOFError),
         ):
             mock_load.return_value = MagicMock(name="test")
@@ -153,7 +153,7 @@ class TestInteractive:
         args = MagicMock(profile="imagej-fiji", backend="claude", model=None)
         with (
             patch("device_use.profiles.loader.load_profile") as mock_load,
-            patch("device_use.cli._create_backend") as mock_backend,
+            patch("device_use.cli._create_backend") as _mock_backend,
             patch("device_use.core.agent.DeviceAgent") as mock_agent_cls,
             patch("builtins.input", side_effect=["do something", "exit"]),
         ):
@@ -171,7 +171,7 @@ class TestInteractive:
         args = MagicMock(profile="imagej-fiji", backend="claude", model=None)
         with (
             patch("device_use.profiles.loader.load_profile") as mock_load,
-            patch("device_use.cli._create_backend") as mock_backend,
+            patch("device_use.cli._create_backend") as _mock_backend,
             patch("device_use.core.agent.DeviceAgent") as mock_agent_cls,
             patch("builtins.input", side_effect=["do something", "q"]),
         ):
@@ -188,7 +188,7 @@ class TestInteractive:
         args = MagicMock(profile="imagej-fiji", backend="claude", model=None)
         with (
             patch("device_use.profiles.loader.load_profile") as mock_load,
-            patch("device_use.cli._create_backend") as mock_backend,
+            patch("device_use.cli._create_backend") as _mock_backend,
             patch("builtins.input", side_effect=["", "quit"]),
         ):
             mock_load.return_value = MagicMock(name="test")
