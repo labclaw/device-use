@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # TopSpin command-line interface commands
 TOPSPIN_COMMANDS = {
-    "open_dataset": 're {path}',
+    "open_dataset": "re {path}",
     "fourier_transform": "efp",
     "auto_phase": "apk",
     "baseline_correct": "absn",
@@ -71,6 +71,7 @@ class TopSpinGUIAutomation:
             return
         try:
             from anthropic import Anthropic
+
             self._client = Anthropic()
             self._available = True
         except ImportError:
@@ -89,6 +90,7 @@ class TopSpinGUIAutomation:
         into TopSpin's CLI. Available on macOS and Linux.
         """
         import platform
+
         return platform.system() in ("Darwin", "Linux")
 
     def detect_topspin_window(self) -> bool:
@@ -98,6 +100,7 @@ class TopSpinGUIAutomation:
         or wmctrl on Linux.
         """
         import platform
+
         system = platform.system()
 
         if system == "Darwin":
@@ -110,10 +113,15 @@ class TopSpinGUIAutomation:
         """Detect TopSpin on macOS using AppleScript."""
         try:
             result = subprocess.run(
-                ["osascript", "-e",
-                 'tell application "System Events" to get name of every process '
-                 'whose name contains "TopSpin"'],
-                capture_output=True, text=True, timeout=5,
+                [
+                    "osascript",
+                    "-e",
+                    'tell application "System Events" to get name of every process '
+                    'whose name contains "TopSpin"',
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             found = "TopSpin" in result.stdout
             self._topspin_visible = found
@@ -126,7 +134,9 @@ class TopSpinGUIAutomation:
         try:
             result = subprocess.run(
                 ["wmctrl", "-l"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             found = "TopSpin" in result.stdout
             self._topspin_visible = found
@@ -140,6 +150,7 @@ class TopSpinGUIAutomation:
         Returns PNG bytes of the screen capture.
         """
         import platform
+
         system = platform.system()
 
         if system == "Darwin":
@@ -151,12 +162,14 @@ class TopSpinGUIAutomation:
     def _screenshot_macos(self) -> bytes:
         """Take screenshot on macOS using screencapture."""
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             tmp_path = f.name
         try:
             subprocess.run(
                 ["screencapture", "-x", tmp_path],
-                timeout=10, check=True,
+                timeout=10,
+                check=True,
             )
             return Path(tmp_path).read_bytes()
         finally:
@@ -165,6 +178,7 @@ class TopSpinGUIAutomation:
     def _screenshot_linux(self) -> bytes:
         """Take screenshot on Linux using scrot or import."""
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             tmp_path = f.name
         try:
@@ -250,17 +264,20 @@ class TopSpinGUIAutomation:
             '''
             subprocess.run(
                 ["osascript", "-e", script],
-                timeout=10, capture_output=True,
+                timeout=10,
+                capture_output=True,
             )
         else:
             # Linux: use xdotool
             subprocess.run(
                 ["xdotool", "type", "--delay", "50", command],
-                timeout=10, capture_output=True,
+                timeout=10,
+                capture_output=True,
             )
             subprocess.run(
                 ["xdotool", "key", "Return"],
-                timeout=5, capture_output=True,
+                timeout=5,
+                capture_output=True,
             )
 
     def verify_step(self, label: str) -> dict[str, Any]:
@@ -286,7 +303,11 @@ class TopSpinGUIAutomation:
             verify: Take verification screenshot after each step.
             on_screenshot: Callback receiving dict with screenshot bytes per step.
         """
-        commands = [("efp", "fourier_transform"), ("apbk", "auto_phase_baseline"), ("ppf", "peak_pick")]
+        commands = [
+            ("efp", "fourier_transform"),
+            ("apbk", "auto_phase_baseline"),
+            ("ppf", "peak_pick"),
+        ]
         for cmd, label in commands:
             logger.info("GUI: Running %s", cmd)
             self.type_command(cmd)

@@ -17,14 +17,16 @@ from typing import Any
 
 class ControlMode(Enum):
     """How device-use talks to the instrument."""
-    API = "api"         # programmatic (gRPC, REST, serial, VISA, etc.)
-    GUI = "gui"         # visual automation (Computer Use / screen interaction)
+
+    API = "api"  # programmatic (gRPC, REST, serial, VISA, etc.)
+    GUI = "gui"  # visual automation (Computer Use / screen interaction)
     OFFLINE = "offline"  # local processing, no instrument software needed
 
 
 @dataclass
 class InstrumentInfo:
     """Metadata about an instrument."""
+
     name: str
     vendor: str
     instrument_type: str  # "nmr", "microscope", "liquid_handler", etc.

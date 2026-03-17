@@ -1,17 +1,17 @@
 """Tests for the NMR instrument modules (processor, adapter, brain, visualizer)."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
 from device_use.instruments import ControlMode
 from device_use.instruments.base import InstrumentInfo
-from device_use.instruments.nmr.processor import NMRPeak, NMRProcessor, NMRSpectrum
 from device_use.instruments.nmr.adapter import TopSpinAdapter
-
+from device_use.instruments.nmr.processor import NMRPeak, NMRProcessor, NMRSpectrum
 
 # ── NMRPeak ──────────────────────────────────────────────────────
+
 
 class TestNMRPeak:
     def test_basic_peak(self):
@@ -27,6 +27,7 @@ class TestNMRPeak:
 
 
 # ── NMRSpectrum ──────────────────────────────────────────────────
+
 
 class TestNMRSpectrum:
     def test_basic_spectrum(self):
@@ -65,6 +66,7 @@ class TestNMRSpectrum:
 
 # ── NMRProcessor ─────────────────────────────────────────────────
 
+
 class TestNMRProcessor:
     def test_processor_instantiation(self):
         proc = NMRProcessor()
@@ -79,6 +81,7 @@ class TestNMRProcessor:
 
 
 # ── TopSpinAdapter ───────────────────────────────────────────────
+
 
 class TestTopSpinAdapter:
     def test_default_mode(self):
@@ -147,6 +150,7 @@ class TestTopSpinAdapter:
 
 # ── Visualizer ───────────────────────────────────────────────────
 
+
 class TestVisualizer:
     def test_plot_returns_bytes(self):
         """plot_spectrum with output_path=None should return bytes."""
@@ -186,9 +190,11 @@ class TestVisualizer:
 
 # ── Brain (cached mode) ─────────────────────────────────────────
 
+
 class TestNMRBrain:
     def test_brain_instantiation(self):
         from device_use.instruments.nmr.brain import NMRBrain
+
         brain = NMRBrain()
         assert brain is not None
 
@@ -220,6 +226,7 @@ class TestNMRBrain:
 
 
 # ── SpectralLibrary ──────────────────────────────────────────────
+
 
 class TestSpectralLibrary:
     def test_add_and_list(self):
@@ -316,8 +323,9 @@ class TestSpectralLibrary:
         assert matches[0].score == 1.0
 
     def test_from_examdata(self):
-        from device_use.instruments.nmr.library import SpectralLibrary
         from pathlib import Path
+
+        from device_use.instruments.nmr.library import SpectralLibrary
 
         lib = SpectralLibrary.from_examdata()
         if Path("/opt/topspin5.0.0/examdata").exists():
@@ -342,12 +350,14 @@ class TestTopSpinGUIAutomation:
     def test_command_mode_no_api_key(self):
         with patch.dict("os.environ", {}, clear=True):
             from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
+
             gui = TopSpinGUIAutomation()
             assert not gui.available
             assert gui.command_mode_available
 
     def test_verify_returns_screenshot_bytes(self):
         from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
+
         gui = TopSpinGUIAutomation()
         with patch.object(gui, "take_screenshot", return_value=b"fake_png"):
             result = gui.verify_step("test")
@@ -357,6 +367,7 @@ class TestTopSpinGUIAutomation:
 
     def test_process_spectrum_with_verification(self):
         from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
+
         gui = TopSpinGUIAutomation()
         screenshots = []
         with patch.object(gui, "type_command"):
@@ -366,6 +377,7 @@ class TestTopSpinGUIAutomation:
 
     def test_process_spectrum_without_verification(self):
         from device_use.instruments.nmr.gui_automation import TopSpinGUIAutomation
+
         gui = TopSpinGUIAutomation()
         with patch.object(gui, "type_command"):
             # Should not error even without verify

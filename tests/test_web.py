@@ -13,6 +13,7 @@ def client():
 
 # ── Status & Architecture ────────────────────────────────────────
 
+
 class TestStatus:
     def test_status(self, client):
         res = client.get("/api/status")
@@ -35,6 +36,7 @@ class TestStatus:
 
 
 # ── NMR Endpoints ────────────────────────────────────────────────
+
 
 class TestNMREndpoints:
     def test_datasets(self, client):
@@ -77,6 +79,7 @@ class TestNMREndpoints:
 
 # ── Plate Reader Endpoints ───────────────────────────────────────
 
+
 class TestPlateReaderEndpoints:
     def test_datasets(self, client):
         res = client.get("/api/plate-reader/datasets")
@@ -117,6 +120,7 @@ class TestPlateReaderEndpoints:
 
 # ── Tools Endpoint ───────────────────────────────────────────────
 
+
 class TestToolsEndpoint:
     def test_tools(self, client):
         res = client.get("/api/tools")
@@ -128,6 +132,7 @@ class TestToolsEndpoint:
 
 
 # ── Frontend ─────────────────────────────────────────────────────
+
 
 class TestFrontend:
     def test_homepage(self, client):

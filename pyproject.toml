@@ -57,6 +57,15 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# Cached expert responses / HTML templates contain intentionally long text lines
+"src/device_use/instruments/nmr/demo_cache.py" = ["E501"]
+"src/device_use/instruments/plate_reader/brain.py" = ["E501"]
+"src/device_use/web/app.py" = ["E402", "E501"]
+# Test data / late imports for conditional test sections
+"tests/test_backends.py" = ["E402"]
+"tests/test_ai_scientist_loop.py" = ["N806"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

@@ -1,4 +1,5 @@
 """Tests for operator base classes and AccessibilityOperator."""
+
 from __future__ import annotations
 
 import time
@@ -126,12 +127,12 @@ def _create_operator_with_mocks():
     """Create an AccessibilityOperator with fully mocked frameworks."""
     cf, ax = _make_mock_frameworks()
 
-    with patch("ctypes.cdll") as mock_cdll, \
-         patch("ctypes.util.find_library") as mock_find:
+    with patch("ctypes.cdll") as mock_cdll, patch("ctypes.util.find_library") as mock_find:
         mock_find.side_effect = lambda name: f"/fake/{name}"
         mock_cdll.LoadLibrary.side_effect = [cf, ax]
 
         from device_use.operators.a11y import AccessibilityOperator
+
         op = AccessibilityOperator(pid=12345)
 
     return op, cf, ax

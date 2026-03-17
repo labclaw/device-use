@@ -47,7 +47,9 @@ class NMRProcessor:
         dic, data = ng.bruker.read(str(path))
         return dic, data
 
-    def process_1d(self, dic: dict, fid: np.ndarray, dataset_path: str | Path | None = None) -> NMRSpectrum:
+    def process_1d(
+        self, dic: dict, fid: np.ndarray, dataset_path: str | Path | None = None
+    ) -> NMRSpectrum:
         """Process a 1D FID into a phased spectrum with peak list."""
         # Remove digital filter artifact
         fid = ng.bruker.remove_digital_filter(dic, fid)
@@ -69,12 +71,12 @@ class NMRProcessor:
         spectrum = ng.proc_base.rev(spectrum)
 
         # Automatic phase correction (suppress scipy optimizer output)
-        import io
         import contextlib
+        import io
         import warnings
+
         try:
-            with contextlib.redirect_stdout(io.StringIO()), \
-                 warnings.catch_warnings():
+            with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 spectrum = ng.proc_autophase.autops(spectrum, "acme")
         except Exception:
@@ -117,9 +119,7 @@ class NMRProcessor:
 
         return result
 
-    def pick_peaks(
-        self, spectrum: NMRSpectrum, threshold_fraction: float = 0.02
-    ) -> list[NMRPeak]:
+    def pick_peaks(self, spectrum: NMRSpectrum, threshold_fraction: float = 0.02) -> list[NMRPeak]:
         """Pick peaks from a processed spectrum."""
         data = spectrum.data
         ppm = spectrum.ppm_scale
@@ -165,14 +165,14 @@ class NMRProcessor:
     def get_spectrum_summary(self, spectrum: NMRSpectrum) -> str:
         """Generate a text summary of the spectrum for LLM context."""
         lines = [
-            f"NMR Spectrum Summary",
+            "NMR Spectrum Summary",
             f"  Nucleus: {spectrum.nucleus}",
             f"  Frequency: {spectrum.frequency_mhz:.1f} MHz",
             f"  Solvent: {spectrum.solvent}",
             f"  Title: {spectrum.title}",
             f"  Sample: {spectrum.sample_name}",
             f"  Number of peaks: {len(spectrum.peaks)}",
-            f"",
+            "",
             self.format_peak_list(spectrum.peaks),
         ]
         return "\n".join(lines)

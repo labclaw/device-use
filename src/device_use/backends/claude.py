@@ -9,9 +9,7 @@ import re
 from typing import Any
 
 import backoff
-from anthropic import APIStatusError, AsyncAnthropic, RateLimitError
-
-from device_use.backends.base import VisionBackend
+from anthropic import AsyncAnthropic, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -74,14 +72,14 @@ class ClaudeBackend:
             },
         }
 
-    async def observe(
-        self, screenshot: bytes, context: str = ""
-    ) -> dict[str, Any]:
+    async def observe(self, screenshot: bytes, context: str = "") -> dict[str, Any]:
         """Describe what's visible on screen."""
         prompt = (
             "Describe what you see on this screen. Identify all visible UI elements, "
             "dialogs, menus, and the current state of the application. "
-            "Respond with JSON: {\"description\": \"...\", \"elements\": [{\"name\": \"...\", \"type\": \"...\", \"location\": \"...\"}]}"
+            "Respond with JSON: "
+            '{"description": "...", "elements": '
+            '[{"name": "...", "type": "...", "location": "..."}]}'
         )
         if context:
             prompt = f"Context: {context}\n\n{prompt}"
@@ -114,7 +112,10 @@ class ClaudeBackend:
             recent = history[-5:]
             history_text = "Recent actions:\n"
             for h in recent:
-                history_text += f"- Step {h.get('step', '?')}: {h.get('action', '?')} → {h.get('result', '?')}\n"
+                step = h.get("step", "?")
+                action = h.get("action", "?")
+                result = h.get("result", "?")
+                history_text += f"- Step {step}: {action} → {result}\n"
             history_text += "\n"
 
         prompt = (
@@ -158,14 +159,12 @@ class ClaudeBackend:
                 "confidence": 0.0,
             }
 
-    async def locate(
-        self, screenshot: bytes, element_description: str
-    ) -> tuple[int, int] | None:
+    async def locate(self, screenshot: bytes, element_description: str) -> tuple[int, int] | None:
         """Find coordinates of a UI element. Claude supports grounding."""
         prompt = (
             f"Find the UI element: {element_description}\n\n"
-            "Respond with ONLY the pixel coordinates as JSON: {\"x\": 123, \"y\": 456}\n"
-            "If the element is not visible, respond with: {\"x\": null, \"y\": null}"
+            'Respond with ONLY the pixel coordinates as JSON: {"x": 123, "y": 456}\n'
+            'If the element is not visible, respond with: {"x": null, "y": null}'
         )
 
         messages = [

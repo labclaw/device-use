@@ -1,7 +1,5 @@
 """Integration tests — multi-instrument pipelines through the orchestrator."""
 
-import pytest
-
 from device_use.instruments import ControlMode
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.plate_reader import PlateReaderAdapter, PlateReading
@@ -51,22 +49,28 @@ class TestMultiInstrumentPipeline:
         orch.connect_all()
 
         pipeline = Pipeline("cross_instrument")
-        pipeline.add_step(PipelineStep(
-            name="nmr_data",
-            tool_name="topspin.list_datasets",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="plate_data",
-            tool_name="platereader.list_datasets",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="summary",
-            handler=lambda ctx: {
-                "nmr_datasets": len(ctx["nmr_data"]),
-                "plate_datasets": len(ctx["plate_data"]),
-                "total": len(ctx["nmr_data"]) + len(ctx["plate_data"]),
-            },
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="nmr_data",
+                tool_name="topspin.list_datasets",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="plate_data",
+                tool_name="platereader.list_datasets",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="summary",
+                handler=lambda ctx: {
+                    "nmr_datasets": len(ctx["nmr_data"]),
+                    "plate_datasets": len(ctx["plate_data"]),
+                    "total": len(ctx["nmr_data"]) + len(ctx["plate_data"]),
+                },
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -84,10 +88,12 @@ class TestMultiInstrumentPipeline:
         orch.register(PlateReaderAdapter(mode=ControlMode.OFFLINE))
 
         pipeline = Pipeline("event_test")
-        pipeline.add_step(PipelineStep(
-            name="step1",
-            handler=lambda ctx: "done",
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="step1",
+                handler=lambda ctx: "done",
+            )
+        )
         orch.run(pipeline)
 
         event_types = [e.event_type for e in events]
@@ -144,20 +150,26 @@ class TestMultiInstrumentPipeline:
         orch.connect_all()
 
         pipeline = Pipeline("conditional_cross")
-        pipeline.add_step(PipelineStep(
-            name="nmr_check",
-            tool_name="topspin.list_datasets",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="plate_if_nmr",
-            tool_name="platereader.list_datasets",
-            condition=lambda ctx: len(ctx.get("nmr_check", [])) > 0,
-        ))
-        pipeline.add_step(PipelineStep(
-            name="skip_if_no_nmr",
-            handler=lambda ctx: "should not run",
-            condition=lambda ctx: len(ctx.get("nmr_check", [])) == 0,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="nmr_check",
+                tool_name="topspin.list_datasets",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="plate_if_nmr",
+                tool_name="platereader.list_datasets",
+                condition=lambda ctx: len(ctx.get("nmr_check", [])) > 0,
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="skip_if_no_nmr",
+                handler=lambda ctx: "should not run",
+                condition=lambda ctx: len(ctx.get("nmr_check", [])) == 0,
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success

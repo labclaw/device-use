@@ -1,4 +1,5 @@
 """Base operator abstraction for instrument control."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -9,10 +10,11 @@ from typing import Any
 
 class ControlLayer(IntEnum):
     """Control layers ordered by preference (lower = faster/more reliable)."""
-    API = 1       # Direct programmatic control
-    SCRIPT = 2    # AppleScript/JXA/macro
-    A11Y = 3      # Accessibility API
-    CU = 4        # Computer Use (VLM)
+
+    API = 1  # Direct programmatic control
+    SCRIPT = 2  # AppleScript/JXA/macro
+    A11Y = 3  # Accessibility API
+    CU = 4  # Computer Use (VLM)
 
 
 class BaseOperator(ABC):

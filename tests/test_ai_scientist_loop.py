@@ -57,26 +57,36 @@ SAMPLE_AI_RESPONSE = """\
 """
 
 _PEAKS = [
-    NMRPeak(ppm=7.29, intensity=100.0), NMRPeak(ppm=6.62, intensity=80.0),
-    NMRPeak(ppm=6.05, intensity=75.0),  NMRPeak(ppm=5.49, intensity=50.0),
-    NMRPeak(ppm=2.23, intensity=90.0),  NMRPeak(ppm=2.02, intensity=85.0),
-    NMRPeak(ppm=1.54, intensity=60.0),  NMRPeak(ppm=0.83, intensity=95.0),
+    NMRPeak(ppm=7.29, intensity=100.0),
+    NMRPeak(ppm=6.62, intensity=80.0),
+    NMRPeak(ppm=6.05, intensity=75.0),
+    NMRPeak(ppm=5.49, intensity=50.0),
+    NMRPeak(ppm=2.23, intensity=90.0),
+    NMRPeak(ppm=2.02, intensity=85.0),
+    NMRPeak(ppm=1.54, intensity=60.0),
+    NMRPeak(ppm=0.83, intensity=95.0),
 ]
 
 
 @pytest.fixture
 def sample_spectrum():
     return NMRSpectrum(
-        data=np.zeros(1024), ppm_scale=np.linspace(12, 0, 1024), peaks=list(_PEAKS),
-        nucleus="1H", solvent="CDCl3", frequency_mhz=400.0,
-        title="Alpha Ionone", sample_name="exam_CMCse_1",
+        data=np.zeros(1024),
+        ppm_scale=np.linspace(12, 0, 1024),
+        peaks=list(_PEAKS),
+        nucleus="1H",
+        solvent="CDCl3",
+        frequency_mhz=400.0,
+        title="Alpha Ionone",
+        sample_name="exam_CMCse_1",
     )
 
 
 @pytest.fixture
 def sample_hypothesis():
     return Hypothesis(
-        compound_name="Alpha-Ionone", confidence="High",
+        compound_name="Alpha-Ionone",
+        confidence="High",
         raw_analysis=SAMPLE_AI_RESPONSE,
         peak_assignments=["7.29", "6.62", "6.05", "5.49", "2.23", "0.83"],
     )
@@ -84,10 +94,13 @@ def sample_hypothesis():
 
 def _make_iteration(hyp, *, score=0.85, formula=True, lib=0.75, pubchem=None):
     return Iteration(
-        round=1, hypothesis=hyp, grounding_score=score,
+        round=1,
+        hypothesis=hyp,
+        grounding_score=score,
         formula_match=formula,
         pubchem_data=pubchem or {"CID": 5282108, "MolecularFormula": "C13H20O"},
-        library_score=lib, constraints=[],
+        library_score=lib,
+        constraints=[],
     )
 
 
@@ -99,13 +112,18 @@ def sample_iteration(sample_hypothesis):
 @pytest.fixture
 def sample_audit_trail(sample_iteration, sample_hypothesis):
     return AuditTrail(
-        question="What compound is in exam_CMCse_1?", dataset="exam_CMCse_1",
-        formula="C13H20O", iterations=[sample_iteration], accepted=True,
-        final_hypothesis=sample_hypothesis, total_time=4.2,
+        question="What compound is in exam_CMCse_1?",
+        dataset="exam_CMCse_1",
+        formula="C13H20O",
+        iterations=[sample_iteration],
+        accepted=True,
+        final_hypothesis=sample_hypothesis,
+        total_time=4.2,
     )
 
 
 # ── parse_hypothesis ────────────────────────────────────────────
+
 
 class TestParseHypothesis:
     def test_extracts_compound_name(self):
@@ -140,6 +158,7 @@ class TestParseHypothesis:
 
 # ── calculate_peak_coverage ─────────────────────────────────────
 
+
 class TestCalculatePeakCoverage:
     def test_all_peaks_mentioned(self, sample_spectrum):
         assert calculate_peak_coverage(sample_spectrum, SAMPLE_AI_RESPONSE, top_n=6) >= 0.7
@@ -159,18 +178,21 @@ class TestCalculatePeakCoverage:
 
 # ── calculate_grounding_score ───────────────────────────────────
 
+
 class TestCalculateGroundingScore:
     def test_perfect_score(self):
         assert calculate_grounding_score(True, 1.0, 1.0) == pytest.approx(1.0)
 
     def test_formula_mismatch_penalty(self):
-        delta = (calculate_grounding_score(True, 1.0, 1.0)
-                 - calculate_grounding_score(False, 1.0, 1.0))
+        delta = calculate_grounding_score(True, 1.0, 1.0) - calculate_grounding_score(
+            False, 1.0, 1.0
+        )
         assert delta == pytest.approx(0.3)
 
     def test_zero_coverage_penalty(self):
-        delta = (calculate_grounding_score(True, 1.0, 1.0)
-                 - calculate_grounding_score(True, 0.0, 1.0))
+        delta = calculate_grounding_score(True, 1.0, 1.0) - calculate_grounding_score(
+            True, 0.0, 1.0
+        )
         assert delta == pytest.approx(0.4)
 
     def test_weighted_formula(self):
@@ -186,14 +208,19 @@ class TestCalculateGroundingScore:
 
 # ── build_constraints ───────────────────────────────────────────
 
+
 class TestBuildConstraints:
-    def _iter(self, *, name="Unknown", conf="Low", assignments=None,
-              score=0.2, formula=False, lib=0.0):
+    def _iter(
+        self, *, name="Unknown", conf="Low", assignments=None, score=0.2, formula=False, lib=0.0
+    ):
         return Iteration(
             round=1,
             hypothesis=Hypothesis(name, conf, "", assignments or []),
-            grounding_score=score, formula_match=formula,
-            pubchem_data=None, library_score=lib, constraints=[],
+            grounding_score=score,
+            formula_match=formula,
+            pubchem_data=None,
+            library_score=lib,
+            constraints=[],
         )
 
     def test_low_score_mentions_issues(self, sample_spectrum):
@@ -209,8 +236,7 @@ class TestBuildConstraints:
 
     def test_unexplained_peaks_listed(self, sample_spectrum):
         text = build_constraints(
-            self._iter(name="Ethanol", assignments=["7.29"], score=0.3,
-                       formula=True, lib=0.2),
+            self._iter(name="Ethanol", assignments=["7.29"], score=0.3, formula=True, lib=0.2),
             sample_spectrum,
         ).lower()
         assert "peak" in text or "unexplained" in text or "unassigned" in text
@@ -221,15 +247,22 @@ class TestBuildConstraints:
 
 # ── generate_report ─────────────────────────────────────────────
 
+
 class TestGenerateReport:
     def _report(self, audit, spectrum, tmp_path):
         report_path = generate_report(
-            audit, spectrum, str(tmp_path / "spectrum.png"), tmp_path,
+            audit,
+            spectrum,
+            str(tmp_path / "spectrum.png"),
+            tmp_path,
         )
         return report_path.read_text()
 
     def test_threshold_respected_in_audit_trail(
-        self, sample_audit_trail, sample_spectrum, tmp_path,
+        self,
+        sample_audit_trail,
+        sample_spectrum,
+        tmp_path,
     ):
         """Report should use audit.threshold, not hardcoded 0.7."""
         # Score is 0.85. With threshold=0.9, it should show "No".
@@ -269,6 +302,7 @@ class TestGenerateReport:
 
 # ── Data structure sanity ───────────────────────────────────────
 
+
 class TestDataStructures:
     def test_hypothesis_fields(self, sample_hypothesis):
         assert sample_hypothesis.compound_name == "Alpha-Ionone"
@@ -299,6 +333,7 @@ class TestVerifyWithPubchem:
     def test_formula_match_strips_whitespace(self):
         """Formulas with different whitespace should still match."""
         from unittest.mock import patch
+
         mock_data = {"MolecularFormula": "C 13 H 20 O", "CID": 123}
         with patch.object(_demo, "PubChemTool") as MockTool:
             MockTool.return_value.lookup_by_name.return_value = mock_data
@@ -308,6 +343,7 @@ class TestVerifyWithPubchem:
 
     def test_formula_mismatch(self):
         from unittest.mock import patch
+
         mock_data = {"MolecularFormula": "C6H12O6", "CID": 456}
         with patch.object(_demo, "PubChemTool") as MockTool:
             MockTool.return_value.lookup_by_name.return_value = mock_data
@@ -316,7 +352,9 @@ class TestVerifyWithPubchem:
 
     def test_pubchem_error_returns_none(self):
         from unittest.mock import patch
+
         from device_use.tools.pubchem import PubChemError
+
         with patch.object(_demo, "PubChemTool") as MockTool:
             MockTool.return_value.lookup_by_name.side_effect = PubChemError("fail")
             data, match = verify_with_pubchem("nonexistent", "C1H1")
@@ -325,6 +363,7 @@ class TestVerifyWithPubchem:
 
     def test_empty_formula_handling(self):
         from unittest.mock import patch
+
         mock_data = {"MolecularFormula": "", "CID": 789}
         with patch.object(_demo, "PubChemTool") as MockTool:
             MockTool.return_value.lookup_by_name.return_value = mock_data
@@ -360,6 +399,7 @@ class TestScoreBar:
 class TestFindDataset:
     def test_finds_by_sample_name(self):
         from unittest.mock import MagicMock
+
         adapter = MagicMock()
         adapter.list_datasets.return_value = [
             {"sample": "exam_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
@@ -371,6 +411,7 @@ class TestFindDataset:
 
     def test_finds_by_title(self):
         from unittest.mock import MagicMock
+
         adapter = MagicMock()
         adapter.list_datasets.return_value = [
             {"sample": "exam_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
@@ -380,6 +421,7 @@ class TestFindDataset:
 
     def test_case_insensitive(self):
         from unittest.mock import MagicMock
+
         adapter = MagicMock()
         adapter.list_datasets.return_value = [
             {"sample": "EXAM_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
@@ -389,6 +431,7 @@ class TestFindDataset:
 
     def test_returns_none_when_not_found(self):
         from unittest.mock import MagicMock
+
         adapter = MagicMock()
         adapter.list_datasets.return_value = [
             {"sample": "exam_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},
@@ -398,6 +441,7 @@ class TestFindDataset:
 
     def test_expno_must_match(self):
         from unittest.mock import MagicMock
+
         adapter = MagicMock()
         adapter.list_datasets.return_value = [
             {"sample": "exam_CMCse_1", "title": "Alpha Ionone", "expno": 1, "path": "/data/1"},

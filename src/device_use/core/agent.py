@@ -7,7 +7,6 @@ and action execution into a coherent agent loop.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
 from typing import Any
@@ -140,17 +139,21 @@ class DeviceAgent:
                     consecutive_parse_failures += 1
                     logger.error(
                         "Failed to parse action (%d/%d): %s",
-                        consecutive_parse_failures, max_parse_failures, e,
+                        consecutive_parse_failures,
+                        max_parse_failures,
+                        e,
                     )
-                    self._history.add(HistoryEntry(
-                        step=step,
-                        action=action_data,
-                        observation=observation,
-                        reasoning=plan.get("reasoning", ""),
-                        screenshot=screenshot,
-                        success=False,
-                        call_id=plan.get("call_id"),
-                    ))
+                    self._history.add(
+                        HistoryEntry(
+                            step=step,
+                            action=action_data,
+                            observation=observation,
+                            reasoning=plan.get("reasoning", ""),
+                            screenshot=screenshot,
+                            success=False,
+                            call_id=plan.get("call_id"),
+                        )
+                    )
                     self._history.compact()
                     if consecutive_parse_failures >= max_parse_failures:
                         return AgentResult(
@@ -196,21 +199,21 @@ class DeviceAgent:
                 verify_screenshot = await self._capture_screenshot()
 
                 # UPDATE history
-                self._history.add(HistoryEntry(
-                    step=step,
-                    action=action_data,
-                    observation=observation,
-                    reasoning=plan.get("reasoning", ""),
-                    screenshot=verify_screenshot,
-                    success=result.success,
-                    call_id=plan.get("call_id"),
-                ))
+                self._history.add(
+                    HistoryEntry(
+                        step=step,
+                        action=action_data,
+                        observation=observation,
+                        reasoning=plan.get("reasoning", ""),
+                        screenshot=verify_screenshot,
+                        success=result.success,
+                        call_id=plan.get("call_id"),
+                    )
+                )
                 self._history.compact()
 
                 if not result.success:
-                    logger.warning(
-                        "Action failed at step %d: %s", step + 1, result.error
-                    )
+                    logger.warning("Action failed at step %d: %s", step + 1, result.error)
 
             # Max steps reached
             logger.warning("Max steps (%d) reached", self._max_steps)

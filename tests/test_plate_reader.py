@@ -12,8 +12,8 @@ from device_use.instruments.plate_reader import (
     WellPlate,
 )
 
-
 # ── Models ───────────────────────────────────────────────────────────
+
 
 class TestWell:
     def test_name(self):
@@ -65,6 +65,7 @@ class TestWellPlate:
 
 
 # ── Adapter ──────────────────────────────────────────────────────────
+
 
 class TestPlateReaderAdapter:
     def test_info(self):
@@ -153,6 +154,7 @@ class TestPlateReaderAdapter:
 
 # ── Orchestrator Integration ─────────────────────────────────────────
 
+
 class TestPlateReaderOrchestration:
     def test_register_with_orchestrator(self):
         from device_use.orchestrator import Orchestrator
@@ -205,6 +207,7 @@ class TestPlateReaderOrchestration:
 
 
 # ── Brain (AI interpretation) ──────────────────────────────────────
+
 
 class TestPlateReaderBrain:
     def test_interpret_elisa_cached(self):

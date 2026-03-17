@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 def plot_plate_heatmap(
-    reading: "PlateReading",
+    reading: PlateReading,
     output_path: str | None = "output/plate_heatmap.png",
     title: str | None = None,
 ) -> bytes:
@@ -27,6 +27,7 @@ def plot_plate_heatmap(
         PNG image bytes.
     """
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -59,8 +60,7 @@ def plot_plate_heatmap(
             val = data[i, j]
             text = f"{val:.2f}" if val < 100 else f"{val:.0f}"
             color = "white" if val > (data.max() * 0.6) else "black"
-            ax.text(j, i, text, ha="center", va="center",
-                    fontsize=6, color=color)
+            ax.text(j, i, text, ha="center", va="center", fontsize=6, color=color)
 
     # Colorbar
     cbar = plt.colorbar(im, ax=ax, fraction=0.02, pad=0.04)
@@ -74,14 +74,14 @@ def plot_plate_heatmap(
 
     # Save to bytes
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
-                facecolor="white")
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     png_bytes = buf.getvalue()
 
     # Optionally save to file
     if output_path:
         from pathlib import Path
+
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         Path(output_path).write_bytes(png_bytes)
 

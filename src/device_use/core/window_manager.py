@@ -38,9 +38,7 @@ class WindowManager:
     def find_window(self, title_pattern: str) -> WindowInfo | None:
         """Find window matching title regex pattern."""
         if self._platform != "linux":
-            raise NotImplementedError(
-                f"Window management not yet supported on {self._platform}"
-            )
+            raise NotImplementedError(f"Window management not yet supported on {self._platform}")
         pattern = re.compile(title_pattern, re.IGNORECASE)
         active_int = self._get_active_window_int()
         for win in self._list_windows_raw():
@@ -59,9 +57,7 @@ class WindowManager:
     def focus_window(self, window_id: str) -> bool:
         """Bring window to foreground."""
         if self._platform != "linux":
-            raise NotImplementedError(
-                f"Window management not yet supported on {self._platform}"
-            )
+            raise NotImplementedError(f"Window management not yet supported on {self._platform}")
         try:
             subprocess.run(
                 ["wmctrl", "-i", "-a", window_id],
@@ -75,9 +71,7 @@ class WindowManager:
     def get_window_rect(self, window_id: str) -> tuple[int, int, int, int]:
         """Get window position and size (x, y, width, height)."""
         if self._platform != "linux":
-            raise NotImplementedError(
-                f"Window management not yet supported on {self._platform}"
-            )
+            raise NotImplementedError(f"Window management not yet supported on {self._platform}")
         target_int = self._normalize_id(window_id)
         for win in self._list_windows_raw():
             if self._normalize_id(win["id"]) == target_int:
@@ -87,18 +81,14 @@ class WindowManager:
     def is_window_active(self, window_id: str) -> bool:
         """Check if window is currently in foreground."""
         if self._platform != "linux":
-            raise NotImplementedError(
-                f"Window management not yet supported on {self._platform}"
-            )
+            raise NotImplementedError(f"Window management not yet supported on {self._platform}")
         active_int = self._get_active_window_int()
         return self._normalize_id(window_id) == active_int
 
     def list_windows(self) -> list[WindowInfo]:
         """List all visible windows."""
         if self._platform != "linux":
-            raise NotImplementedError(
-                f"Window management not yet supported on {self._platform}"
-            )
+            raise NotImplementedError(f"Window management not yet supported on {self._platform}")
         active_int = self._get_active_window_int()
         results: list[WindowInfo] = []
         for win in self._list_windows_raw():
@@ -135,8 +125,7 @@ class WindowManager:
                 )
             except (subprocess.CalledProcessError, FileNotFoundError):
                 raise RuntimeError(
-                    f"'{cmd}' is required but not installed. "
-                    f"Install with: sudo apt install {cmd}"
+                    f"'{cmd}' is required but not installed. Install with: sudo apt install {cmd}"
                 )
 
     def _get_active_window_int(self) -> int:
@@ -173,12 +162,14 @@ class WindowManager:
                 continue
             wid, _desktop, x, y, w, h, _host = parts[:7]
             title = parts[7]
-            windows.append({
-                "id": wid,
-                "x": int(x),
-                "y": int(y),
-                "w": int(w),
-                "h": int(h),
-                "title": title,
-            })
+            windows.append(
+                {
+                    "id": wid,
+                    "x": int(x),
+                    "y": int(y),
+                    "w": int(w),
+                    "h": int(h),
+                    "title": title,
+                }
+            )
         return windows

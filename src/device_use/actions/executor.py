@@ -12,8 +12,8 @@ import time
 from typing import TYPE_CHECKING
 
 import pyautogui
-from pyautogui import FailSafeException as _FailSafeException
 import pyperclip
+from pyautogui import FailSafeException as _FailSafeException
 
 from device_use.actions.models import (
     Action,
@@ -29,7 +29,7 @@ from device_use.actions.models import (
     WaitAction,
 )
 from device_use.actions.scaling import CoordinateScaler
-from device_use.core.models import ActionRequest, ActionResult, ActionType
+from device_use.core.models import ActionRequest, ActionResult
 
 if TYPE_CHECKING:
     from device_use.safety.guard import SafetyGuard
@@ -73,9 +73,7 @@ class ActionExecutor:
         if self._safety is not None:
             verdict = self._safety.check(request)
             if not verdict.allowed:
-                logger.warning(
-                    "Action blocked by safety %s: %s", verdict.layer, verdict.reason
-                )
+                logger.warning("Action blocked by safety %s: %s", verdict.layer, verdict.reason)
                 return ActionResult(
                     success=False,
                     action=request,
@@ -96,9 +94,7 @@ class ActionExecutor:
             if not isinstance(action, WaitAction):
                 time.sleep(self._settle_delay)
 
-            return ActionResult(
-                success=True, action=request, duration_ms=duration_ms
-            )
+            return ActionResult(success=True, action=request, duration_ms=duration_ms)
 
         except _FailSafeException:
             # Physical emergency stop (mouse moved to corner) — MUST propagate
@@ -147,9 +143,7 @@ class ActionExecutor:
             sx, sy = self._scale(action.start_x, action.start_y)
             ex, ey = self._scale(action.end_x, action.end_y)
             pyautogui.moveTo(sx, sy)
-            pyautogui.drag(
-                ex - sx, ey - sy, duration=action.duration, button="left"
-            )
+            pyautogui.drag(ex - sx, ey - sy, duration=action.duration, button="left")
 
         elif isinstance(action, WaitAction):
             time.sleep(action.seconds)

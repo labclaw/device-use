@@ -7,7 +7,7 @@ This prevents context window overflow while preserving reasoning chain.
 from __future__ import annotations
 
 import base64
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -44,9 +44,7 @@ class AgentHistory:
 
         Text content (observations, reasoning) is never dropped.
         """
-        entries_with_images = [
-            i for i, e in enumerate(self._entries) if e.screenshot is not None
-        ]
+        entries_with_images = [i for i, e in enumerate(self._entries) if e.screenshot is not None]
         if len(entries_with_images) <= self._max_images:
             return
 
@@ -84,14 +82,16 @@ class AgentHistory:
             # Screenshot (only if still present after compaction)
             if entry.screenshot is not None:
                 b64 = base64.standard_b64encode(entry.screenshot).decode("utf-8")
-                content_parts.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
-                        "data": b64,
-                    },
-                })
+                content_parts.append(
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": b64,
+                        },
+                    }
+                )
 
             messages.append({"role": "user", "content": content_parts})
 

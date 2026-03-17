@@ -70,7 +70,7 @@ class PromptBuilder:
             f"Step: {step}\n"
             f"Current observation: {observation}\n\n"
             "Plan the next action. Respond with a JSON object:\n"
-            '{\n'
+            "{\n"
             '  "reasoning": "why this action is needed",\n'
             '  "action": {\n'
             '    "action_type": "click|type|hotkey|scroll|drag|wait",\n'
@@ -78,10 +78,10 @@ class PromptBuilder:
             '    "text": "...",           // for type action\n'
             '    "keys": ["ctrl", "s"],   // for hotkey action\n'
             '    "description": "what this action does"\n'
-            '  },\n'
+            "  },\n"
             '  "done": false,\n'
             '  "confidence": 0.9\n'
-            '}\n\n'
+            "}\n\n"
             'Set "done": true when the task is complete.\n'
             'Set "done": false and include "error" if the task cannot be completed.'
         )

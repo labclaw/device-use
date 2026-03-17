@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,8 +22,7 @@ from device_use.safety.layers import (
     ParameterBoundsChecker,
     StateVerificationChecker,
 )
-from device_use.safety.models import SafetyConfig, SafetyVerdict
-
+from device_use.safety.models import SafetyConfig
 
 # --- Fixtures ---
 
@@ -130,9 +128,7 @@ class TestL1ActionWhitelist:
 
 
 class TestL2ParameterBounds:
-    def test_in_bounds_passes(
-        self, hardware_profile: DeviceProfile, hardware_config: SafetyConfig
-    ):
+    def test_in_bounds_passes(self, hardware_profile: DeviceProfile, hardware_config: SafetyConfig):
         checker = ParameterBoundsChecker()
         action = ActionRequest(
             action_type=ActionType.CLICK,
@@ -347,9 +343,7 @@ class TestL4HumanConfirmation:
         verdict = checker.check(action, hardware_profile, hardware_config)
         assert verdict.allowed is True
 
-    def test_denied_by_human(
-        self, hardware_profile: DeviceProfile, hardware_config: SafetyConfig
-    ):
+    def test_denied_by_human(self, hardware_profile: DeviceProfile, hardware_config: SafetyConfig):
         checker = HumanConfirmationGate(auto_approve=False)
         action = ActionRequest(
             action_type=ActionType.CLICK,
@@ -542,9 +536,7 @@ class TestRateLimiting:
         assert verdict.layer == "rate_limit"
         assert "Rate limit exceeded" in verdict.reason
 
-    def test_rate_limit_not_hit_under_threshold(
-        self, software_profile: DeviceProfile
-    ):
+    def test_rate_limit_not_hit_under_threshold(self, software_profile: DeviceProfile):
         guard = SafetyGuard(software_profile)
         action = ActionRequest(action_type=ActionType.CLICK)
 

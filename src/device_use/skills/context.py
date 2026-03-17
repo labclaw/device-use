@@ -6,6 +6,7 @@ Reads from device-skills repository to build a complete system prompt with:
     Layer 3: Dynamic RAG retrieval (task-specific docs)
     Layer 4: User context (from labclaw, optional)
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,10 +17,10 @@ import yaml
 logger = logging.getLogger(__name__)
 
 # Token budgets (approximate chars, ~4 chars/token)
-_L1_BUDGET = 8000   # ~2000 tokens for device identity
-_L2_BUDGET = 3000   # ~750 tokens for science domain
-_L3_BUDGET = 6000   # ~1500 tokens for RAG docs
-_L4_BUDGET = 2000   # ~500 tokens for user context
+_L1_BUDGET = 8000  # ~2000 tokens for device identity
+_L2_BUDGET = 3000  # ~750 tokens for science domain
+_L3_BUDGET = 6000  # ~1500 tokens for RAG docs
+_L4_BUDGET = 2000  # ~500 tokens for user context
 
 
 def _truncate(text: str, max_chars: int) -> str:
@@ -90,9 +91,7 @@ class SkillContext:
         self.device_dir = skills_dir / "devices" / device_name
 
         if not self.device_dir.exists():
-            raise FileNotFoundError(
-                f"Device '{device_name}' not found at {self.device_dir}"
-            )
+            raise FileNotFoundError(f"Device '{device_name}' not found at {self.device_dir}")
 
         # Layer 1: SOUL.md (required) + profile.yaml (optional)
         soul_path = self.device_dir / "SOUL.md"
@@ -102,9 +101,7 @@ class SkillContext:
 
         profile_path = self.device_dir / "profile.yaml"
         if profile_path.exists():
-            self.profile: dict | None = yaml.safe_load(
-                profile_path.read_text(encoding="utf-8")
-            )
+            self.profile: dict | None = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
         else:
             self.profile = None
             logger.debug("No profile.yaml for %s", device_name)
@@ -141,30 +138,39 @@ class SkillContext:
 
         # --- Layer 2: Scientific Domain ---
         if self.science:
-            sections.append(_truncate(
-                f"# Scientific Domain Knowledge\n\n{self.science}",
-                _L2_BUDGET,
-            ))
+            sections.append(
+                _truncate(
+                    f"# Scientific Domain Knowledge\n\n{self.science}",
+                    _L2_BUDGET,
+                )
+            )
 
         # --- Layer 3: Dynamic RAG ---
         if task:
             try:
                 from device_use.knowledge.retriever import retrieve_docs
+
                 docs = retrieve_docs(
-                    self.device_name, task, skills_dir=self.skills_dir,
+                    self.device_name,
+                    task,
+                    skills_dir=self.skills_dir,
                 )
                 if docs:
                     sections.append(_truncate(docs, _L3_BUDGET))
             except Exception:
                 logger.debug(
-                    "RAG retrieval failed for %s", self.device_name, exc_info=True,
+                    "RAG retrieval failed for %s",
+                    self.device_name,
+                    exc_info=True,
                 )
 
         # --- Layer 4: User Context ---
         if user_context:
-            sections.append(_truncate(
-                f"# User Context\n\n{user_context}",
-                _L4_BUDGET,
-            ))
+            sections.append(
+                _truncate(
+                    f"# User Context\n\n{user_context}",
+                    _L4_BUDGET,
+                )
+            )
 
         return "\n\n---\n\n".join(sections)

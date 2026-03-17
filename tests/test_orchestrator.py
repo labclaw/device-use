@@ -4,7 +4,6 @@ import pytest
 
 from device_use.instruments.base import BaseInstrument, ControlMode, InstrumentInfo
 from device_use.orchestrator import (
-    Event,
     EventType,
     Orchestrator,
     Pipeline,
@@ -14,8 +13,8 @@ from device_use.orchestrator import (
     ToolSpec,
 )
 
-
 # ── Mock instrument for testing ──────────────────────────────────
+
 
 class MockInstrument(BaseInstrument):
     """Minimal instrument for testing orchestrator registration."""
@@ -52,6 +51,7 @@ class MockInstrument(BaseInstrument):
 
 # ── ToolRegistry ─────────────────────────────────────────────────
 
+
 class TestToolRegistry:
     def test_register_instrument(self):
         registry = ToolRegistry()
@@ -76,11 +76,13 @@ class TestToolRegistry:
 
     def test_custom_tool(self):
         registry = ToolRegistry()
-        registry.register_tool(ToolSpec(
-            name="custom.hello",
-            description="Say hello",
-            handler=lambda: "hello",
-        ))
+        registry.register_tool(
+            ToolSpec(
+                name="custom.hello",
+                description="Say hello",
+                handler=lambda: "hello",
+            )
+        )
 
         tool = registry.get_tool("custom.hello")
         assert tool is not None
@@ -124,6 +126,7 @@ class TestToolRegistry:
 
 
 # ── Pipeline ─────────────────────────────────────────────────────
+
 
 class TestPipeline:
     def test_empty_pipeline(self):
@@ -173,9 +176,12 @@ class TestPipeline:
         load.add_step(PipelineStep(name="value", handler=lambda ctx: 42))
 
         transform = Pipeline("transform")
-        transform.add_step(PipelineStep(
-            name="doubled", handler=lambda ctx: ctx["value"] * 2,
-        ))
+        transform.add_step(
+            PipelineStep(
+                name="doubled",
+                handler=lambda ctx: ctx["value"] * 2,
+            )
+        )
 
         full = Pipeline.compose("composed", load, transform)
         result = orch.run(full)
@@ -212,6 +218,7 @@ class TestPipeline:
 
 # ── Orchestrator ─────────────────────────────────────────────────
 
+
 class TestOrchestrator:
     def test_register_and_connect(self):
         orch = Orchestrator()
@@ -241,10 +248,12 @@ class TestOrchestrator:
         orch.register(inst)
 
         pipeline = Pipeline("test_pipeline")
-        pipeline.add_step(PipelineStep(
-            name="list",
-            tool_name="mockspec.list_datasets",
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="list",
+                tool_name="mockspec.list_datasets",
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -257,10 +266,12 @@ class TestOrchestrator:
         orch = Orchestrator()
 
         pipeline = Pipeline("handler_test")
-        pipeline.add_step(PipelineStep(
-            name="compute",
-            handler=lambda ctx: 42,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="compute",
+                handler=lambda ctx: 42,
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -271,14 +282,18 @@ class TestOrchestrator:
         orch = Orchestrator()
 
         pipeline = Pipeline("context_test")
-        pipeline.add_step(PipelineStep(
-            name="first",
-            handler=lambda ctx: {"value": 10},
-        ))
-        pipeline.add_step(PipelineStep(
-            name="second",
-            handler=lambda ctx: ctx["first"]["value"] * 2,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="first",
+                handler=lambda ctx: {"value": 10},
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="second",
+                handler=lambda ctx: ctx["first"]["value"] * 2,
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -288,20 +303,26 @@ class TestOrchestrator:
         orch = Orchestrator()
 
         pipeline = Pipeline("conditional_test")
-        pipeline.add_step(PipelineStep(
-            name="always",
-            handler=lambda ctx: "ran",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="skipped",
-            handler=lambda ctx: "should not run",
-            condition=lambda ctx: False,
-        ))
-        pipeline.add_step(PipelineStep(
-            name="conditional",
-            handler=lambda ctx: "also ran",
-            condition=lambda ctx: ctx.get("always") == "ran",
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="always",
+                handler=lambda ctx: "ran",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="skipped",
+                handler=lambda ctx: "should not run",
+                condition=lambda ctx: False,
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="conditional",
+                handler=lambda ctx: "also ran",
+                condition=lambda ctx: ctx.get("always") == "ran",
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -314,18 +335,24 @@ class TestOrchestrator:
         orch = Orchestrator()
 
         pipeline = Pipeline("fail_test")
-        pipeline.add_step(PipelineStep(
-            name="ok",
-            handler=lambda ctx: "fine",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="fail",
-            handler=lambda ctx: 1 / 0,
-        ))
-        pipeline.add_step(PipelineStep(
-            name="never",
-            handler=lambda ctx: "unreachable",
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="ok",
+                handler=lambda ctx: "fine",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="fail",
+                handler=lambda ctx: 1 / 0,
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="never",
+                handler=lambda ctx: "unreachable",
+            )
+        )
 
         result = orch.run(pipeline)
         assert not result.success
@@ -342,10 +369,12 @@ class TestOrchestrator:
         orch.register(inst)
 
         pipeline = Pipeline("event_test")
-        pipeline.add_step(PipelineStep(
-            name="step1",
-            handler=lambda ctx: "done",
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="step1",
+                handler=lambda ctx: "done",
+            )
+        )
 
         orch.run(pipeline)
 
@@ -369,22 +398,28 @@ class TestOrchestrator:
         orch = Orchestrator()
 
         results = []
-        orch.registry.register_tool(ToolSpec(
-            name="echo",
-            description="Echo params",
-            handler=lambda **kw: results.append(kw) or kw,
-        ))
+        orch.registry.register_tool(
+            ToolSpec(
+                name="echo",
+                description="Echo params",
+                handler=lambda **kw: results.append(kw) or kw,
+            )
+        )
 
         pipeline = Pipeline("resolve_test")
-        pipeline.add_step(PipelineStep(
-            name="first",
-            handler=lambda ctx: "/data/ethanol/1",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="use_ref",
-            tool_name="echo",
-            params={"data_path": "{first}", "static": "hello"},
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="first",
+                handler=lambda ctx: "/data/ethanol/1",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="use_ref",
+                tool_name="echo",
+                params={"data_path": "{first}", "static": "hello"},
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -409,10 +444,13 @@ class TestOrchestrator:
 
         pipeline = Pipeline("summary_test")
         pipeline.add_step(PipelineStep(name="ok", handler=lambda ctx: "done"))
-        pipeline.add_step(PipelineStep(
-            name="skip", handler=lambda ctx: None,
-            condition=lambda ctx: False,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="skip",
+                handler=lambda ctx: None,
+                condition=lambda ctx: False,
+            )
+        )
 
         result = orch.run(pipeline)
         summary = result.summary()
@@ -436,9 +474,11 @@ class TestOrchestrator:
 
 # ── Factory ──────────────────────────────────────────────────────
 
+
 class TestCreateOrchestrator:
     def test_default_all_instruments(self):
         from device_use import create_orchestrator
+
         orch = create_orchestrator()
         instruments = orch.registry.list_instruments()
         assert len(instruments) == 2
@@ -447,6 +487,7 @@ class TestCreateOrchestrator:
 
     def test_nmr_only(self):
         from device_use import create_orchestrator
+
         orch = create_orchestrator(instruments=["nmr"])
         instruments = orch.registry.list_instruments()
         assert len(instruments) == 1
@@ -454,6 +495,7 @@ class TestCreateOrchestrator:
 
     def test_plate_reader_only(self):
         from device_use import create_orchestrator
+
         orch = create_orchestrator(instruments=["plate_reader"])
         instruments = orch.registry.list_instruments()
         assert len(instruments) == 1
@@ -461,6 +503,7 @@ class TestCreateOrchestrator:
 
     def test_no_connect(self):
         from device_use import create_orchestrator
+
         orch = create_orchestrator(connect=False)
         instruments = orch.registry.list_instruments()
         assert len(instruments) == 2
@@ -472,6 +515,7 @@ class TestCreateOrchestrator:
 
     def test_tools_registered(self):
         from device_use import create_orchestrator
+
         orch = create_orchestrator()
         tools = orch.registry.list_tools()
         assert len(tools) == 6
@@ -483,6 +527,7 @@ class TestCreateOrchestrator:
         """_discover_plugins returns empty dict when no plugins installed."""
         from device_use import _discover_plugins
         from device_use.instruments import ControlMode
+
         plugins = _discover_plugins(ControlMode.OFFLINE)
         # No external plugins installed in test env — should return empty or
         # only built-in entry points
@@ -490,13 +535,14 @@ class TestCreateOrchestrator:
 
     def test_plugin_override(self, monkeypatch):
         """Plugin instruments merge with built-ins."""
-        from device_use import create_orchestrator, _discover_plugins
+        from device_use import create_orchestrator
 
         # Mock _discover_plugins to return a fake instrument
         def mock_discover(control_mode):
             return {
                 "mock_plugin": lambda: MockInstrument(),
             }
+
         monkeypatch.setattr("device_use._discover_plugins", mock_discover)
 
         orch = create_orchestrator()
@@ -510,23 +556,29 @@ class TestCreateOrchestrator:
 
 # ── Parallel Pipeline ────────────────────────────────────────
 
+
 class TestParallelPipeline:
     def test_parallel_steps_run(self):
         """Steps with the same parallel group run together."""
         import time
+
         orch = Orchestrator()
 
         pipeline = Pipeline("parallel_test")
-        pipeline.add_step(PipelineStep(
-            name="a",
-            handler=lambda ctx: (time.sleep(0.05), "a_done")[1],
-            parallel="group1",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="b",
-            handler=lambda ctx: (time.sleep(0.05), "b_done")[1],
-            parallel="group1",
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="a",
+                handler=lambda ctx: (time.sleep(0.05), "a_done")[1],
+                parallel="group1",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="b",
+                handler=lambda ctx: (time.sleep(0.05), "b_done")[1],
+                parallel="group1",
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -540,16 +592,26 @@ class TestParallelPipeline:
         orch = Orchestrator()
 
         pipeline = Pipeline("mixed_test")
-        pipeline.add_step(PipelineStep(
-            name="p1", handler=lambda ctx: 10, parallel="load",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="p2", handler=lambda ctx: 20, parallel="load",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="combine",
-            handler=lambda ctx: ctx["p1"] + ctx["p2"],
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="p1",
+                handler=lambda ctx: 10,
+                parallel="load",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="p2",
+                handler=lambda ctx: 20,
+                parallel="load",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="combine",
+                handler=lambda ctx: ctx["p1"] + ctx["p2"],
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -575,15 +637,26 @@ class TestParallelPipeline:
         orch = Orchestrator()
 
         pipeline = Pipeline("fail_parallel")
-        pipeline.add_step(PipelineStep(
-            name="ok", handler=lambda ctx: "fine", parallel="g",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="fail", handler=lambda ctx: 1 / 0, parallel="g",
-        ))
-        pipeline.add_step(PipelineStep(
-            name="never", handler=lambda ctx: "unreachable",
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="ok",
+                handler=lambda ctx: "fine",
+                parallel="g",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="fail",
+                handler=lambda ctx: 1 / 0,
+                parallel="g",
+            )
+        )
+        pipeline.add_step(
+            PipelineStep(
+                name="never",
+                handler=lambda ctx: "unreachable",
+            )
+        )
 
         result = orch.run(pipeline)
         assert not result.success
@@ -593,6 +666,7 @@ class TestParallelPipeline:
 
 
 # ── Retry & Timeout ─────────────────────────────────────────
+
 
 class TestRetryAndTimeout:
     def test_retry_succeeds_on_second_attempt(self):
@@ -607,11 +681,13 @@ class TestRetryAndTimeout:
             return "ok"
 
         pipeline = Pipeline("retry_test")
-        pipeline.add_step(PipelineStep(
-            name="flaky_step",
-            handler=flaky,
-            retries=2,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="flaky_step",
+                handler=flaky,
+                retries=2,
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -623,11 +699,13 @@ class TestRetryAndTimeout:
         orch = Orchestrator()
 
         pipeline = Pipeline("retry_exhausted")
-        pipeline.add_step(PipelineStep(
-            name="always_fail",
-            handler=lambda ctx: 1 / 0,
-            retries=2,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="always_fail",
+                handler=lambda ctx: 1 / 0,
+                retries=2,
+            )
+        )
 
         result = orch.run(pipeline)
         assert not result.success
@@ -648,9 +726,13 @@ class TestRetryAndTimeout:
             return "recovered"
 
         pipeline = Pipeline("retry_events")
-        pipeline.add_step(PipelineStep(
-            name="s", handler=fail_once, retries=1,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="s",
+                handler=fail_once,
+                retries=1,
+            )
+        )
         orch.run(pipeline)
 
         end_events = [e for e in events if e.event_type == EventType.STEP_END]
@@ -660,14 +742,17 @@ class TestRetryAndTimeout:
     def test_timeout_enforced(self):
         """Step that exceeds timeout_s is killed."""
         import time as _time
+
         orch = Orchestrator()
 
         pipeline = Pipeline("timeout_test")
-        pipeline.add_step(PipelineStep(
-            name="slow",
-            handler=lambda ctx: (_time.sleep(5), "done")[1],
-            timeout_s=0.1,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="slow",
+                handler=lambda ctx: (_time.sleep(5), "done")[1],
+                timeout_s=0.1,
+            )
+        )
 
         result = orch.run(pipeline)
         assert not result.success
@@ -679,11 +764,13 @@ class TestRetryAndTimeout:
         orch = Orchestrator()
 
         pipeline = Pipeline("timeout_ok")
-        pipeline.add_step(PipelineStep(
-            name="fast",
-            handler=lambda ctx: "quick",
-            timeout_s=5.0,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="fast",
+                handler=lambda ctx: "quick",
+                timeout_s=5.0,
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -692,6 +779,7 @@ class TestRetryAndTimeout:
     def test_retry_with_timeout(self):
         """Retry + timeout together: each attempt gets its own timeout."""
         import time as _time
+
         orch = Orchestrator()
         call_count = [0]
 
@@ -702,12 +790,14 @@ class TestRetryAndTimeout:
             return "recovered"
 
         pipeline = Pipeline("retry_timeout")
-        pipeline.add_step(PipelineStep(
-            name="combo",
-            handler=slow_then_fast,
-            retries=1,
-            timeout_s=0.1,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="combo",
+                handler=slow_then_fast,
+                retries=1,
+                timeout_s=0.1,
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success
@@ -715,6 +805,7 @@ class TestRetryAndTimeout:
 
 
 # ── Middleware Hooks ─────────────────────────────────────────
+
 
 class TestMiddlewareHooks:
     def test_before_step_hook(self):
@@ -748,9 +839,7 @@ class TestMiddlewareHooks:
     def test_before_hook_aborts_step(self):
         """If a pre-hook raises, the step fails without executing."""
         orch = Orchestrator()
-        orch.before_step(lambda step, ctx: (_ for _ in ()).throw(
-            ValueError("safety check failed")
-        ))
+        orch.before_step(lambda step, ctx: (_ for _ in ()).throw(ValueError("safety check failed")))
 
         pipeline = Pipeline("abort_test")
         pipeline.add_step(PipelineStep(name="blocked", handler=lambda ctx: "nope"))
@@ -763,9 +852,7 @@ class TestMiddlewareHooks:
     def test_after_hook_aborts_pipeline(self):
         """If a post-hook raises, the step is marked failed."""
         orch = Orchestrator()
-        orch.after_step(lambda step, ctx: (_ for _ in ()).throw(
-            ValueError("validation failed")
-        ))
+        orch.after_step(lambda step, ctx: (_ for _ in ()).throw(ValueError("validation failed")))
 
         pipeline = Pipeline("post_abort")
         pipeline.add_step(PipelineStep(name="ok", handler=lambda ctx: "done"))
@@ -796,10 +883,13 @@ class TestMiddlewareHooks:
         orch.before_step(lambda step, ctx: log.append(step.name))
 
         pipeline = Pipeline("skip_hook")
-        pipeline.add_step(PipelineStep(
-            name="skipped", handler=lambda ctx: 1,
-            condition=lambda ctx: False,
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name="skipped",
+                handler=lambda ctx: 1,
+                condition=lambda ctx: False,
+            )
+        )
 
         result = orch.run(pipeline)
         assert result.success

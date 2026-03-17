@@ -1,4 +1,5 @@
 """Tests for shared demo library."""
+
 import sys
 from pathlib import Path
 
@@ -6,9 +7,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "demos"))
 
 from lib.terminal import (
-    BOLD, DIM, GREEN, CYAN, YELLOW, RED, MAGENTA, RESET,
-    CHECK, ARROW, WARN,
-    banner, step, ok, warn, err, info, progress, done, section, finale,
+    ARROW,
+    BOLD,
+    CHECK,
+    CYAN,
+    GREEN,
+    RESET,
+    WARN,
+    YELLOW,
+    banner,
+    err,
+    finale,
+    info,
+    ok,
+    section,
+    step,
+    warn,
 )
 
 
@@ -73,6 +87,7 @@ class TestTerminalHelpers:
 
     def test_phase_prints_number_and_title(self, capsys):
         from lib.terminal import phase
+
         phase(2, "Processing", "sub info")
         out = capsys.readouterr().out
         assert "Phase 2" in out
@@ -83,6 +98,7 @@ class TestTerminalHelpers:
 class TestDemoRunner:
     def test_runner_creates_argparser(self):
         from lib.runner import DemoRunner
+
         runner = DemoRunner("Test Demo")
         args = runner.parser.parse_args(["--mode", "offline", "--no-brain"])
         assert args.mode == "offline"
@@ -90,12 +106,14 @@ class TestDemoRunner:
 
     def test_runner_default_mode_is_auto(self):
         from lib.runner import DemoRunner
+
         runner = DemoRunner("Test Demo")
         args = runner.parser.parse_args([])
         assert args.mode == "auto"
 
     def test_runner_connect_offline(self, tmp_path):
         from lib.runner import DemoRunner
+
         examdata = tmp_path / "examdata"
         examdata.mkdir()
         runner = DemoRunner("Test")
@@ -106,10 +124,16 @@ class TestDemoRunner:
 
     def test_print_peak_table_empty(self, capsys):
         from lib.runner import print_peak_table
+
         from device_use.instruments.nmr.processor import NMRSpectrum
+
         spectrum = NMRSpectrum(
-            data=[0.0], ppm_scale=[0.0], peaks=[],
-            frequency_mhz=400.0, nucleus="1H", solvent="CDCl3",
+            data=[0.0],
+            ppm_scale=[0.0],
+            peaks=[],
+            frequency_mhz=400.0,
+            nucleus="1H",
+            solvent="CDCl3",
         )
         print_peak_table(spectrum)
         out = capsys.readouterr().out
@@ -119,12 +143,14 @@ class TestDemoRunner:
 class TestDemoRecorder:
     def test_recorder_init(self, tmp_path):
         from lib.recorder import DemoRecorder
+
         recorder = DemoRecorder(output_dir=tmp_path)
         assert recorder.frame_count == 0
         assert recorder.frames == []
 
     def test_recorder_save_gif_no_frames(self, tmp_path):
         from lib.recorder import DemoRecorder
+
         recorder = DemoRecorder(output_dir=tmp_path)
         result = recorder.save_gif(tmp_path / "test.gif")
         assert result is None

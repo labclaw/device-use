@@ -103,9 +103,7 @@ class DeviceProfile(BaseModel):
     ui_elements: list[UIElement] = Field(default_factory=list)
     workflows: list[WorkflowDefinition] = Field(default_factory=list)
     safety: SafetyConstraints = Field(default_factory=SafetyConstraints)
-    allowed_actions: list[ActionType] = Field(
-        default_factory=lambda: list(ActionType)
-    )
+    allowed_actions: list[ActionType] = Field(default_factory=lambda: list(ActionType))
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

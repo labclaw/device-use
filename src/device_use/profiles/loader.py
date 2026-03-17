@@ -74,12 +74,14 @@ def list_profiles(profiles_dir: Path | None = None) -> list[dict[str, Any]]:
     for yaml_file in sorted(search_dir.rglob("*.yaml")):
         try:
             profile = _load_from_file(yaml_file)
-            profiles.append({
-                "name": profile.name,
-                "path": str(yaml_file),
-                "software": profile.software,
-                "hardware_connected": profile.hardware_connected,
-            })
+            profiles.append(
+                {
+                    "name": profile.name,
+                    "path": str(yaml_file),
+                    "software": profile.software,
+                    "hardware_connected": profile.hardware_connected,
+                }
+            )
         except Exception as e:
             logger.warning("Skipping broken profile %s: %s", yaml_file, e)
             continue

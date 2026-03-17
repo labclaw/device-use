@@ -3,11 +3,11 @@
 import pytest
 
 from device_use.tools.base import BaseTool
-from device_use.tools.pubchem import PubChemTool, PubChemError
-from device_use.tools.tooluniverse import ToolUniverseTool, ToolUniverseError, get_available_tools
-
+from device_use.tools.pubchem import PubChemError, PubChemTool
+from device_use.tools.tooluniverse import ToolUniverseError, ToolUniverseTool, get_available_tools
 
 # ── BaseTool ─────────────────────────────────────────────────────
+
 
 class TestBaseTool:
     def test_abstract_methods(self):
@@ -17,6 +17,7 @@ class TestBaseTool:
 
 
 # ── PubChemTool ──────────────────────────────────────────────────
+
 
 class TestPubChemTool:
     def test_tool_interface(self):
@@ -66,6 +67,7 @@ class TestPubChemTool:
 
 # ── ToolUniverseTool ─────────────────────────────────────────────
 
+
 class TestToolUniverseTool:
     def test_tool_interface(self):
         tool = ToolUniverseTool()
@@ -84,6 +86,7 @@ class TestToolUniverseTool:
     def test_connect_without_package(self):
         """If tooluniverse not installed, connect should raise."""
         from device_use.tools import tooluniverse as tu_mod
+
         if tu_mod._TU_AVAILABLE:
             pytest.skip("tooluniverse is installed")
         tool = ToolUniverseTool()
@@ -99,6 +102,7 @@ class TestToolUniverseTool:
 
 
 # ── Tool Registry ────────────────────────────────────────────────
+
 
 class TestToolRegistry:
     def test_get_available_tools(self):

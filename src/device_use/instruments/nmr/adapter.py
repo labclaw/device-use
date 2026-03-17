@@ -185,9 +185,9 @@ class TopSpinAdapter(BaseInstrument):
     def _process_via_api(self, dataset_path: str) -> NMRSpectrum:
         """Process using TopSpin gRPC API (live, requires running TopSpin)."""
         nmrdata = self._dp.getNMRData(dataset_path)
-        nmrdata.launch("efp")      # exponential multiply + FFT + phase
+        nmrdata.launch("efp")  # exponential multiply + FFT + phase
         nmrdata.launch("apbk -n")  # neural-net auto phase + baseline
-        nmrdata.launch("ppf")      # peak picking
+        nmrdata.launch("ppf")  # peak picking
         # Read back processed data via nmrglue for consistent output format
         return self._process_via_nmrglue(dataset_path)
 

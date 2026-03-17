@@ -11,20 +11,20 @@ Usage::
         --version 5.0.0 \\
         --index-output ./docs/index.yaml
 """
+
 from __future__ import annotations
 
 import argparse
 import re
-import sys
 from html.parser import HTMLParser
 from pathlib import Path
 
 import yaml
 
-
 # ---------------------------------------------------------------------------
 # HTML parser for TopSpin command pages
 # ---------------------------------------------------------------------------
+
 
 class _RedirectParser(HTMLParser):
     """Extract redirect URL from a TopSpin stub page."""
@@ -51,8 +51,13 @@ class _CommandPageParser(HTMLParser):
     """
 
     SECTIONS = {
-        "NAME", "DESCRIPTION", "INPUT FILES", "OUTPUT FILES",
-        "USAGE IN AU PROGRAMS", "SEE ALSO", "INPUT PARAMETERS",
+        "NAME",
+        "DESCRIPTION",
+        "INPUT FILES",
+        "OUTPUT FILES",
+        "USAGE IN AU PROGRAMS",
+        "SEE ALSO",
+        "INPUT PARAMETERS",
     }
 
     def __init__(self) -> None:
@@ -155,6 +160,7 @@ class _CommandPageParser(HTMLParser):
 # ---------------------------------------------------------------------------
 # Conversion functions
 # ---------------------------------------------------------------------------
+
 
 def _resolve_redirect(html_path: Path) -> Path | None:
     """Resolve a redirect stub to the actual en-US content page.
@@ -389,19 +395,21 @@ def convert_all_commands(html_dir: Path, output_dir: Path) -> list[dict]:
         md_path.write_text(md_content, encoding="utf-8")
 
         # Build index entry
-        entries.append({
-            "path": f"commands/{data['name']}.md",
-            "title": data["title"],
-            "tags": data["tags"],
-            "summary": data["summary"],
-            "category": data.get("category"),
-        })
+        entries.append(
+            {
+                "path": f"commands/{data['name']}.md",
+                "title": data["title"],
+                "tags": data["tags"],
+                "summary": data["summary"],
+                "category": data.get("category"),
+            }
+        )
 
     total = len(html_files)
     converted = len(entries)
     print(f"Converted {converted}/{total} pages ({skipped} skipped, {len(errors)} errors)")
     if errors:
-        print(f"Errors (first 10):")
+        print("Errors (first 10):")
         for err in errors[:10]:
             print(f"  - {err}")
 
@@ -430,6 +438,7 @@ def build_index(entries: list[dict], version: str, output_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """CLI entry point for converting TopSpin docs."""

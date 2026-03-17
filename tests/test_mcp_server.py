@@ -38,10 +38,12 @@ class TestMCPTools:
         assert "sample" in result[0]
 
     def test_call_tool_with_params(self):
-        result = json.loads(mcp_server.call_tool(
-            "platereader.process",
-            json.dumps({"data_path": "elisa_il6"}),
-        ))
+        result = json.loads(
+            mcp_server.call_tool(
+                "platereader.process",
+                json.dumps({"data_path": "elisa_il6"}),
+            )
+        )
         # Returns a PlateReading — serialized via default=str
         assert result is not None
 
@@ -84,9 +86,11 @@ class TestMCPTools:
         assert "summary" in result
 
     def test_run_pipeline(self):
-        steps = json.dumps([
-            {"name": "list", "tool_name": "topspin.list_datasets"},
-        ])
+        steps = json.dumps(
+            [
+                {"name": "list", "tool_name": "topspin.list_datasets"},
+            ]
+        )
         result = json.loads(mcp_server.run_pipeline(steps))
         assert result["success"] is True
         assert result["pipeline"] == "mcp_pipeline"
@@ -94,9 +98,11 @@ class TestMCPTools:
         assert result["steps"][0]["status"] == "completed"
 
     def test_run_pipeline_failure(self):
-        steps = json.dumps([
-            {"name": "bad", "tool_name": "nonexistent.tool"},
-        ])
+        steps = json.dumps(
+            [
+                {"name": "bad", "tool_name": "nonexistent.tool"},
+            ]
+        )
         result = json.loads(mcp_server.run_pipeline(steps))
         assert result["success"] is False
         assert result["steps"][0]["status"] == "failed"

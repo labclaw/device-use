@@ -1,7 +1,5 @@
 """Tests for core data models and profile loading."""
 
-from pathlib import Path
-
 import pytest
 from pydantic import ValidationError
 
@@ -24,7 +22,6 @@ from device_use.profiles.loader import (
     load_profile,
     validate_profile,
 )
-
 
 # --- Model construction ---
 

@@ -37,6 +37,7 @@ def _get_orchestrator():
     global _orchestrator
     if _orchestrator is None:
         from device_use import create_orchestrator
+
         _orchestrator = create_orchestrator()
         logger.info(
             "Orchestrator ready: %d instruments, %d tools",
@@ -50,6 +51,7 @@ def _get_orchestrator():
 # MCP Tools
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool()
 def list_instruments() -> str:
     """List all registered scientific instruments and their capabilities."""
@@ -58,14 +60,16 @@ def list_instruments() -> str:
     result = []
     for info in instruments:
         inst = orch.registry.get_instrument(info.name)
-        result.append({
-            "name": info.name,
-            "vendor": info.vendor,
-            "type": info.instrument_type,
-            "version": info.version,
-            "modes": [m.value for m in info.supported_modes],
-            "connected": inst.connected if inst else False,
-        })
+        result.append(
+            {
+                "name": info.name,
+                "vendor": info.vendor,
+                "type": info.instrument_type,
+                "version": info.version,
+                "modes": [m.value for m in info.supported_modes],
+                "connected": inst.connected if inst else False,
+            }
+        )
     return json.dumps(result, indent=2)
 
 
@@ -76,12 +80,14 @@ def list_tools() -> str:
     tools = orch.registry.list_tools()
     result = []
     for tool in tools:
-        result.append({
-            "name": tool.name,
-            "description": tool.description,
-            "instrument_type": tool.instrument_type,
-            "parameters": tool.parameters,
-        })
+        result.append(
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "instrument_type": tool.instrument_type,
+                "parameters": tool.parameters,
+            }
+        )
     return json.dumps(result, indent=2)
 
 
@@ -143,6 +149,7 @@ def nmr_identify(data_path: str, molecular_formula: str = "") -> str:
     spectrum = orch.call_tool("topspin.process", data_path=data_path)
 
     from device_use.instruments.nmr.brain import NMRBrain
+
     brain = NMRBrain()
     analysis = brain.interpret_spectrum(
         spectrum,
@@ -173,13 +180,16 @@ def plate_reader_process(assay_name: str = "") -> str:
         "protocol": reading.protocol,
         "mode": reading.mode.value if hasattr(reading.mode, "value") else str(reading.mode),
         "wavelength_nm": reading.wavelength_nm,
-        "format": reading.plate.format.value if hasattr(reading.plate.format, "value") else str(reading.plate.format),
+        "format": reading.plate.format.value
+        if hasattr(reading.plate.format, "value")
+        else str(reading.plate.format),
         "num_wells": len(reading.plate.wells),
     }
 
     # Summarize well values
     values = [w.value for w in reading.plate.wells]
     import statistics
+
     if values:
         output["summary"] = {
             "mean": round(statistics.mean(values), 4),
@@ -192,9 +202,7 @@ def plate_reader_process(assay_name: str = "") -> str:
     rows: dict[str, list[float]] = {}
     for w in reading.plate.wells:
         rows.setdefault(w.row, []).append(w.value)
-    output["rows"] = {
-        row: round(statistics.mean(vals), 4) for row, vals in rows.items()
-    }
+    output["rows"] = {row: round(statistics.mean(vals), 4) for row, vals in rows.items()}
 
     return json.dumps(output, indent=2)
 
@@ -225,13 +233,15 @@ def run_pipeline(steps_json: str) -> str:
 
     pipeline = Pipeline("mcp_pipeline")
     for step_def in steps:
-        pipeline.add_step(PipelineStep(
-            name=step_def["name"],
-            tool_name=step_def.get("tool_name", ""),
-            params=step_def.get("params", {}),
-            retries=step_def.get("retries", 0),
-            timeout_s=step_def.get("timeout_s", 0),
-        ))
+        pipeline.add_step(
+            PipelineStep(
+                name=step_def["name"],
+                tool_name=step_def.get("tool_name", ""),
+                params=step_def.get("params", {}),
+                retries=step_def.get("retries", 0),
+                timeout_s=step_def.get("timeout_s", 0),
+            )
+        )
 
     result = orch.run(pipeline)
     output = {
@@ -256,25 +266,29 @@ def run_pipeline(steps_json: str) -> str:
 # MCP Resources
 # ---------------------------------------------------------------------------
 
+
 @mcp.resource("device-use://status")
 def get_status() -> str:
     """Current status of the device-use middleware."""
     orch = _get_orchestrator()
     instruments = orch.registry.list_instruments()
     tools = orch.registry.list_tools()
-    return json.dumps({
-        "instruments": len(instruments),
-        "tools": len(tools),
-        "instrument_details": [
-            {"name": i.name, "type": i.instrument_type, "vendor": i.vendor}
-            for i in instruments
-        ],
-    }, indent=2)
+    return json.dumps(
+        {
+            "instruments": len(instruments),
+            "tools": len(tools),
+            "instrument_details": [
+                {"name": i.name, "type": i.instrument_type, "vendor": i.vendor} for i in instruments
+            ],
+        },
+        indent=2,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main():
     mcp.run()

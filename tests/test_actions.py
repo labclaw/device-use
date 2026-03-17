@@ -4,21 +4,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from device_use.actions.executor import ActionExecutor
 from device_use.actions.models import (
     ClickAction,
-    DoubleClickAction,
     DragAction,
     HotkeyAction,
-    RightClickAction,
     ScrollAction,
     TypeAction,
     WaitAction,
     parse_action,
 )
 from device_use.actions.scaling import CoordinateScaler
-from device_use.actions.executor import ActionExecutor
 from device_use.core.models import ActionType
-
 
 # --- Coordinate Scaling ---
 
@@ -27,8 +24,10 @@ class TestCoordinateScaler:
     def test_identity_scaling(self):
         """Same VLM and screen size → no scaling."""
         scaler = CoordinateScaler(
-            vlm_width=1280, vlm_height=800,
-            screen_width=1280, screen_height=800,
+            vlm_width=1280,
+            vlm_height=800,
+            screen_width=1280,
+            screen_height=800,
         )
         assert scaler.vlm_to_screen(100, 200) == (100, 200)
         assert scaler.screen_to_vlm(100, 200) == (100, 200)
@@ -36,8 +35,10 @@ class TestCoordinateScaler:
     def test_2x_scaling(self):
         """VLM 1280x800, screen 2560x1600 → 2x scale."""
         scaler = CoordinateScaler(
-            vlm_width=1280, vlm_height=800,
-            screen_width=2560, screen_height=1600,
+            vlm_width=1280,
+            vlm_height=800,
+            screen_width=2560,
+            screen_height=1600,
         )
         assert scaler.vlm_to_screen(100, 100) == (200, 200)
         assert scaler.screen_to_vlm(200, 200) == (100, 100)
@@ -45,9 +46,12 @@ class TestCoordinateScaler:
     def test_window_offset(self):
         """Window at (100, 50) → adds offset to screen coords."""
         scaler = CoordinateScaler(
-            vlm_width=1280, vlm_height=800,
-            screen_width=1280, screen_height=800,
-            window_x=100, window_y=50,
+            vlm_width=1280,
+            vlm_height=800,
+            screen_width=1280,
+            screen_height=800,
+            window_x=100,
+            window_y=50,
         )
         assert scaler.vlm_to_screen(0, 0) == (100, 50)
         assert scaler.vlm_to_screen(100, 100) == (200, 150)
@@ -56,9 +60,12 @@ class TestCoordinateScaler:
     def test_scaling_with_offset(self):
         """Combined 1.5x scale + window offset."""
         scaler = CoordinateScaler(
-            vlm_width=1280, vlm_height=800,
-            screen_width=1920, screen_height=1200,
-            window_x=50, window_y=30,
+            vlm_width=1280,
+            vlm_height=800,
+            screen_width=1920,
+            screen_height=1200,
+            window_x=50,
+            window_y=30,
         )
         sx, sy = scaler.vlm_to_screen(100, 100)
         # 100 * (1920/1280) + 50 = 150 + 50 = 200
@@ -69,9 +76,12 @@ class TestCoordinateScaler:
     def test_roundtrip(self):
         """VLM→screen→VLM should approximately preserve coordinates."""
         scaler = CoordinateScaler(
-            vlm_width=1280, vlm_height=800,
-            screen_width=1920, screen_height=1080,
-            window_x=100, window_y=50,
+            vlm_width=1280,
+            vlm_height=800,
+            screen_width=1920,
+            screen_height=1080,
+            window_x=100,
+            window_y=50,
         )
         for vx, vy in [(0, 0), (640, 400), (1279, 799)]:
             sx, sy = scaler.vlm_to_screen(vx, vy)
@@ -90,9 +100,12 @@ class TestCoordinateScaler:
     def test_clamp_screen(self):
         """Clamping keeps coordinates within window bounds."""
         scaler = CoordinateScaler(
-            vlm_width=1280, vlm_height=800,
-            screen_width=800, screen_height=600,
-            window_x=100, window_y=50,
+            vlm_width=1280,
+            vlm_height=800,
+            screen_width=800,
+            screen_height=600,
+            window_x=100,
+            window_y=50,
         )
         # Below window
         assert scaler.clamp_screen(0, 0) == (100, 50)
@@ -143,20 +156,24 @@ class TestActionModels:
 
     def test_parse_nested_parameters(self):
         """VLM returns fields nested under 'parameters' dict."""
-        action = parse_action({
-            "action_type": "type",
-            "parameters": {"text": "hello"},
-        })
+        action = parse_action(
+            {
+                "action_type": "type",
+                "parameters": {"text": "hello"},
+            }
+        )
         assert isinstance(action, TypeAction)
         assert action.text == "hello"
 
     def test_parse_nested_parameters_with_coordinates(self):
         """VLM returns coordinates + parameters nested."""
-        action = parse_action({
-            "action_type": "scroll",
-            "coordinates": [100, 200],
-            "parameters": {"clicks": -3},
-        })
+        action = parse_action(
+            {
+                "action_type": "scroll",
+                "coordinates": [100, 200],
+                "parameters": {"clicks": -3},
+            }
+        )
         assert isinstance(action, ScrollAction)
         assert action.x == 100
         assert action.y == 200
@@ -167,6 +184,7 @@ class TestActionModels:
         a = ClickAction(x=0, y=0, button="right")
         assert a.button == "right"
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             ClickAction(x=0, y=0, button="invalid")
 
@@ -227,9 +245,12 @@ class TestActionExecutor:
     @patch("device_use.actions.executor.pyautogui")
     def test_execution_with_scaler(self, mock_pyautogui):
         scaler = CoordinateScaler(
-            vlm_width=1280, vlm_height=800,
-            screen_width=1920, screen_height=1200,
-            window_x=50, window_y=30,
+            vlm_width=1280,
+            vlm_height=800,
+            screen_width=1920,
+            screen_height=1200,
+            window_x=50,
+            window_y=30,
         )
         executor = ActionExecutor(scaler=scaler, settle_delay=0)
         action = ClickAction(x=100, y=100)
@@ -286,6 +307,7 @@ class TestActionExecutor:
     def test_failsafe_exception_propagates(self, mock_pyautogui):
         """pyautogui.FailSafeException must propagate (physical e-stop)."""
         from pyautogui import FailSafeException
+
         mock_pyautogui.click.side_effect = FailSafeException("corner")
         executor = ActionExecutor(settle_delay=0)
         action = ClickAction(x=100, y=200)
@@ -298,17 +320,16 @@ class TestActionExecutor:
         from device_use.safety.models import SafetyVerdict
 
         scaler = CoordinateScaler(
-            vlm_width=1280, vlm_height=800,
-            screen_width=2560, screen_height=1600,
+            vlm_width=1280,
+            vlm_height=800,
+            screen_width=2560,
+            screen_height=1600,
         )
         mock_guard = MagicMock()
         mock_guard.check.return_value = SafetyVerdict(allowed=True)
-        executor = ActionExecutor(
-            safety_guard=mock_guard, scaler=scaler, settle_delay=0
-        )
+        executor = ActionExecutor(safety_guard=mock_guard, scaler=scaler, settle_delay=0)
         action = ClickAction(x=100, y=100)
         executor.execute(action)
         # The ActionRequest passed to safety should have scaled coords
         request = mock_guard.check.call_args[0][0]
         assert request.coordinates == (200, 200)  # 100*2 = 200
-

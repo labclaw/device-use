@@ -21,12 +21,7 @@ def _create_minimal_png() -> bytes:
     raw = b"\x00\xff\x00\x00"
     compressed = zlib.compress(raw)
     idat_crc = zlib.crc32(b"IDAT" + compressed) & 0xFFFFFFFF
-    idat = (
-        struct.pack(">I", len(compressed))
-        + b"IDAT"
-        + compressed
-        + struct.pack(">I", idat_crc)
-    )
+    idat = struct.pack(">I", len(compressed)) + b"IDAT" + compressed + struct.pack(">I", idat_crc)
     iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
     iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
     return sig + ihdr + idat + iend
@@ -41,6 +36,8 @@ def minimal_png() -> bytes:
 @pytest.fixture
 def mock_capture():
     """Async callable returning a minimal PNG, for agent._capture_screenshot."""
+
     async def _capture() -> bytes:
         return _create_minimal_png()
+
     return _capture

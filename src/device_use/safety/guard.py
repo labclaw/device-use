@@ -37,20 +37,25 @@ class SafetyGuard:
         # Build layer chain — L5 emergency stop FIRST (kill switch must preempt all)
         self._layers: list = []
         if config.hardware_connected:
-            self._layers.append(EmergencyStopMonitor())          # L5 — checked first
-        self._layers.append(ActionWhitelistChecker())            # L1 always active
+            self._layers.append(EmergencyStopMonitor())  # L5 — checked first
+        self._layers.append(ActionWhitelistChecker())  # L1 always active
         if config.hardware_connected:
-            self._layers.append(ParameterBoundsChecker())        # L2
-            self._layers.append(StateVerificationChecker())      # L3
-            self._layers.append(HumanConfirmationGate(           # L4
-                auto_approve=auto_approve,
-            ))
+            self._layers.append(ParameterBoundsChecker())  # L2
+            self._layers.append(StateVerificationChecker())  # L3
+            self._layers.append(
+                HumanConfirmationGate(  # L4
+                    auto_approve=auto_approve,
+                )
+            )
 
         # 10K-entry action history deque for rate limiting
         self._history: deque[float] = deque(maxlen=10_000)
 
     def check(self, action: ActionRequest) -> SafetyVerdict:
-        """Run through layers (L5 kill switch first, then L1->L4). Short-circuit on first rejection."""
+        """Run safety layers (L5 kill switch first, then L1->L4).
+
+        Short-circuit on first rejection.
+        """
         # Check rate limit — prune expired entries from left (deque is time-ordered)
         now = time.monotonic()
         cutoff = now - 60.0

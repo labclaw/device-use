@@ -9,6 +9,7 @@ from typing import Any
 
 class PlateFormat(Enum):
     """Standard microplate formats."""
+
     PLATE_6 = 6
     PLATE_12 = 12
     PLATE_24 = 24
@@ -19,6 +20,7 @@ class PlateFormat(Enum):
 
 class ReadingMode(Enum):
     """Measurement modes available on plate readers."""
+
     ABSORBANCE = "absorbance"
     FLUORESCENCE = "fluorescence"
     LUMINESCENCE = "luminescence"
@@ -27,8 +29,9 @@ class ReadingMode(Enum):
 @dataclass
 class Well:
     """A single well in a microplate."""
-    row: str      # A-H for 96-well
-    col: int      # 1-12 for 96-well
+
+    row: str  # A-H for 96-well
+    col: int  # 1-12 for 96-well
     value: float = 0.0
     blank_corrected: float | None = None
 
@@ -40,6 +43,7 @@ class Well:
 @dataclass
 class WellPlate:
     """A microplate with readings."""
+
     format: PlateFormat
     wells: list[Well] = field(default_factory=list)
 
@@ -59,6 +63,7 @@ class WellPlate:
 @dataclass
 class PlateReading:
     """Result of a plate reader measurement."""
+
     plate: WellPlate
     mode: ReadingMode
     wavelength_nm: int

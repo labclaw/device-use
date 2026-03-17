@@ -98,8 +98,7 @@ class ToolUniverseTool(BaseTool):
         """Initialize the ToolUniverse SDK."""
         if not _TU_AVAILABLE:
             raise ToolUniverseError(
-                "tooluniverse package not installed. "
-                "Install with: pip install tooluniverse"
+                "tooluniverse package not installed. Install with: pip install tooluniverse"
             )
         self._tu = _ToolUniverse()
         self._connected = True
@@ -107,9 +106,7 @@ class ToolUniverseTool(BaseTool):
 
     # -- Tool discovery ----------------------------------------------------
 
-    def find_tools(
-        self, query: str, limit: int = 5, method: str = "keyword"
-    ) -> Any:
+    def find_tools(self, query: str, limit: int = 5, method: str = "keyword") -> Any:
         """Find tools matching a query.
 
         Args:
@@ -128,15 +125,15 @@ class ToolUniverseTool(BaseTool):
             "llm": "Tool_Finder_LLM",
         }.get(method, "Tool_Finder_Keyword")
 
-        result = self._tu.run({
-            "name": finder_name,
-            "arguments": {"description": query, "limit": limit},
-        })
+        result = self._tu.run(
+            {
+                "name": finder_name,
+                "arguments": {"description": query, "limit": limit},
+            }
+        )
         return result
 
-    def get_tool_spec(
-        self, tool_name: str, format: str = "openai"
-    ) -> dict[str, Any]:
+    def get_tool_spec(self, tool_name: str, format: str = "openai") -> dict[str, Any]:
         """Get the full specification for a tool.
 
         Args:
@@ -164,10 +161,12 @@ class ToolUniverseTool(BaseTool):
         self._ensure_connected()
 
         logger.info("ToolUniverse calling: %s(%s)", tool_name, arguments)
-        result = self._tu.run({
-            "name": tool_name,
-            "arguments": arguments,
-        })
+        result = self._tu.run(
+            {
+                "name": tool_name,
+                "arguments": arguments,
+            }
+        )
         return result
 
     # -- Chemistry convenience methods -------------------------------------
@@ -200,6 +199,7 @@ class ToolUniverseTool(BaseTool):
 
 
 # -- Registry helper -------------------------------------------------------
+
 
 def get_available_tools() -> list[BaseTool]:
     """Return all available external tools for the Cloud Brain.
