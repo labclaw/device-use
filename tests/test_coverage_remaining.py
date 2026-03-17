@@ -430,7 +430,8 @@ class TestNMRAdapterExtended:
         mock_gui.command_mode_available = True
         mock_gui.detect_topspin_window.return_value = True
 
-        # The import is inside _connect_gui as `from device_use.instruments.nmr.gui_automation import ...`
+        # The import is inside _connect_gui as
+        # `from device_use.instruments.nmr.gui_automation import ...`
         with patch(
             "device_use.instruments.nmr.gui_automation.TopSpinGUIAutomation",
             return_value=mock_gui,
