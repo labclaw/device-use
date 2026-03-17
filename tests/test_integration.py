@@ -1,5 +1,9 @@
 """Integration tests — multi-instrument pipelines through the orchestrator."""
 
+import pathlib
+
+import pytest
+
 from device_use.instruments import ControlMode
 from device_use.instruments.nmr.adapter import TopSpinAdapter
 from device_use.instruments.plate_reader import PlateReaderAdapter, PlateReading
@@ -9,6 +13,11 @@ from device_use.orchestrator import (
     Pipeline,
     PipelineStep,
     StepStatus,
+)
+
+_skip_no_examdata = pytest.mark.skipif(
+    not pathlib.Path("/opt/topspin5.0.0/examdata").exists(),
+    reason="TopSpin examdata not installed",
 )
 
 
@@ -28,6 +37,7 @@ class TestMultiInstrumentPipeline:
         types = {i.instrument_type for i in instruments}
         assert types == {"nmr", "plate_reader"}
 
+    @_skip_no_examdata
     def test_both_connect(self):
         orch = self._make_orchestrator()
         results = orch.connect_all()
@@ -43,6 +53,7 @@ class TestMultiInstrumentPipeline:
         # No collisions
         assert len(names) == len(set(names))
 
+    @_skip_no_examdata
     def test_cross_instrument_pipeline(self):
         """Pipeline that uses both NMR and plate reader in sequence."""
         orch = self._make_orchestrator()
@@ -103,6 +114,7 @@ class TestMultiInstrumentPipeline:
         assert EventType.PIPELINE_START in event_types
         assert EventType.PIPELINE_END in event_types
 
+    @_skip_no_examdata
     def test_nmr_process_through_orchestrator(self):
         """Process NMR data via orchestrator tool call."""
         orch = self._make_orchestrator()
@@ -144,6 +156,7 @@ class TestMultiInstrumentPipeline:
         assert all("topspin" in t.name for t in nmr_tools)
         assert all("platereader" in t.name for t in plate_tools)
 
+    @_skip_no_examdata
     def test_conditional_cross_instrument(self):
         """Conditional step based on NMR results decides whether to run plate reader."""
         orch = self._make_orchestrator()

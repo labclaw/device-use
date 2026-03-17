@@ -1,10 +1,16 @@
 """Tests for the MCP server integration."""
 
 import json
+import pathlib
 
 import pytest
 
 from device_use.integrations import mcp_server
+
+_skip_no_examdata = pytest.mark.skipif(
+    not pathlib.Path("/opt/topspin5.0.0/examdata").exists(),
+    reason="TopSpin examdata not installed",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -31,6 +37,7 @@ class TestMCPTools:
         assert "topspin.list_datasets" in names
         assert "platereader.process" in names
 
+    @_skip_no_examdata
     def test_call_tool_list_datasets(self):
         result = json.loads(mcp_server.call_tool("topspin.list_datasets"))
         assert isinstance(result, list)
@@ -47,11 +54,13 @@ class TestMCPTools:
         # Returns a PlateReading — serialized via default=str
         assert result is not None
 
+    @_skip_no_examdata
     def test_nmr_list_datasets(self):
         result = json.loads(mcp_server.nmr_list_datasets())
         assert isinstance(result, list)
         assert len(result) > 0
 
+    @_skip_no_examdata
     def test_nmr_process(self):
         # Get a dataset path first
         datasets = json.loads(mcp_server.nmr_list_datasets())

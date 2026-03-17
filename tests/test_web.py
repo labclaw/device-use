@@ -1,9 +1,16 @@
 """Tests for the FastAPI web application endpoints."""
 
+import pathlib
+
 import pytest
 from fastapi.testclient import TestClient
 
 from device_use.web.app import app
+
+_skip_no_examdata = pytest.mark.skipif(
+    not pathlib.Path("/opt/topspin5.0.0/examdata").exists(),
+    reason="TopSpin examdata not installed",
+)
 
 
 @pytest.fixture
@@ -15,6 +22,7 @@ def client():
 
 
 class TestStatus:
+    @_skip_no_examdata
     def test_status(self, client):
         res = client.get("/api/status")
         assert res.status_code == 200
@@ -39,6 +47,7 @@ class TestStatus:
 
 
 class TestNMREndpoints:
+    @_skip_no_examdata
     def test_datasets(self, client):
         res = client.get("/api/datasets")
         assert res.status_code == 200
@@ -48,6 +57,7 @@ class TestNMREndpoints:
         assert "sample" in datasets[0]
         assert "expno" in datasets[0]
 
+    @_skip_no_examdata
     def test_process_dataset(self, client):
         # First get a dataset
         datasets = client.get("/api/datasets").json()
@@ -65,6 +75,7 @@ class TestNMREndpoints:
         res = client.get("/api/process/nonexistent/999")
         assert res.status_code == 404
 
+    @_skip_no_examdata
     def test_analyze_stream(self, client):
         datasets = client.get("/api/datasets").json()
         ds = datasets[0]

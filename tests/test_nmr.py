@@ -102,6 +102,10 @@ class TestTopSpinAdapter:
         assert ControlMode.OFFLINE in info.supported_modes
         assert ControlMode.API in info.supported_modes
 
+    @pytest.mark.skipif(
+        not __import__("pathlib").Path("/opt/topspin5.0.0/examdata").exists(),
+        reason="TopSpin examdata not installed",
+    )
     def test_connect_offline(self):
         adapter = TopSpinAdapter()
         result = adapter.connect()
