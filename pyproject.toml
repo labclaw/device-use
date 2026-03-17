@@ -32,6 +32,9 @@ web = [
     "fastapi>=0.100",
     "uvicorn>=0.23",
 ]
+mcp = [
+    "mcp>=1.0",
+]
 tools = [
     "tooluniverse>=1.0",
 ]
@@ -71,6 +74,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "network: tests that require network access (deselect with -m 'not network')",
+    "skipif: conditional skip",
 ]
 
 [tool.coverage.run]
