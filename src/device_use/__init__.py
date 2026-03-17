@@ -17,7 +17,14 @@ def __getattr__(name):
         from device_use.profiles import loader
 
         return getattr(loader, name)
-    if name in ("ActionRequest", "ActionResult", "ActionType", "AgentState", "DeviceProfile", "SafetyLevel"):
+    if name in (
+        "ActionRequest",
+        "ActionResult",
+        "ActionType",
+        "AgentState",
+        "DeviceProfile",
+        "SafetyLevel",
+    ):
         from device_use.core import models
 
         return getattr(models, name)
@@ -51,6 +58,7 @@ def _discover_plugins(control_mode) -> dict:
     BaseInstrument instance.
     """
     import sys
+
     if sys.version_info >= (3, 12):
         from importlib.metadata import entry_points
     else:
@@ -75,7 +83,7 @@ def create_orchestrator(
     mode: str = "offline",
     instruments: list[str] | None = None,
     connect: bool = True,
-) -> "Orchestrator":
+) -> "Orchestrator":  # noqa: F821
     """Create an Orchestrator with auto-discovered instruments.
 
     This is the simplest way to get started with device-use:
@@ -107,12 +115,14 @@ def create_orchestrator(
 
     try:
         from device_use.instruments.nmr.adapter import TopSpinAdapter
+
         _factories["nmr"] = lambda: TopSpinAdapter(mode=control_mode)
     except ImportError:
         pass
 
     try:
         from device_use.instruments.plate_reader import PlateReaderAdapter
+
         _factories["plate_reader"] = lambda: PlateReaderAdapter(mode=control_mode)
     except ImportError:
         pass

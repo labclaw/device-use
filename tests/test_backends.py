@@ -71,12 +71,12 @@ class TestLocate:
 
 class TestObserve:
     async def test_observe_with_valid_json(self, backend: OpenAICompatBackend):
-        mock_response = json.dumps({
-            "description": "A file manager window",
-            "elements": [
-                {"name": "Open", "type": "button", "description": "Open file button"}
-            ],
-        })
+        mock_response = json.dumps(
+            {
+                "description": "A file manager window",
+                "elements": [{"name": "Open", "type": "button", "description": "Open file button"}],
+            }
+        )
         with patch.object(
             backend._client.chat.completions,
             "create",
@@ -89,9 +89,7 @@ class TestObserve:
         assert len(result["elements"]) == 1
         assert result["elements"][0]["name"] == "Open"
 
-    async def test_observe_with_invalid_json_fallback(
-        self, backend: OpenAICompatBackend
-    ):
+    async def test_observe_with_invalid_json_fallback(self, backend: OpenAICompatBackend):
         """When model returns non-JSON, observe should gracefully degrade."""
         raw_text = "I see a file manager with an open button."
         with patch.object(
@@ -108,16 +106,18 @@ class TestObserve:
 
 class TestPlan:
     async def test_plan_with_valid_json(self, backend: OpenAICompatBackend):
-        mock_response = json.dumps({
-            "action": {
-                "action_type": "click",
-                "target": "Open button",
-                "parameters": {},
-            },
-            "reasoning": "Need to click Open to load the file.",
-            "done": False,
-            "confidence": 0.85,
-        })
+        mock_response = json.dumps(
+            {
+                "action": {
+                    "action_type": "click",
+                    "target": "Open button",
+                    "parameters": {},
+                },
+                "reasoning": "Need to click Open to load the file.",
+                "done": False,
+                "confidence": 0.85,
+            }
+        )
         with patch.object(
             backend._client.chat.completions,
             "create",
@@ -133,12 +133,18 @@ class TestPlan:
         assert result["confidence"] == 0.85
 
     async def test_plan_with_history(self, backend: OpenAICompatBackend):
-        mock_response = json.dumps({
-            "action": {"action_type": "type", "target": "filename field", "parameters": {"text": "image.tif"}},
-            "reasoning": "Type filename after opening dialog.",
-            "done": False,
-            "confidence": 0.9,
-        })
+        mock_response = json.dumps(
+            {
+                "action": {
+                    "action_type": "type",
+                    "target": "filename field",
+                    "parameters": {"text": "image.tif"},
+                },
+                "reasoning": "Type filename after opening dialog.",
+                "done": False,
+                "confidence": 0.9,
+            }
+        )
         history = [{"step": 0, "action": "click", "target": "Open button"}]
         with patch.object(
             backend._client.chat.completions,
@@ -146,15 +152,11 @@ class TestPlan:
             new_callable=AsyncMock,
             return_value=_make_chat_response(mock_response),
         ):
-            result = await backend.plan(
-                TINY_PNG, task="Open image.tif", history=history
-            )
+            result = await backend.plan(TINY_PNG, task="Open image.tif", history=history)
 
         assert result["action"]["action_type"] == "type"
 
-    async def test_plan_with_invalid_json_fallback(
-        self, backend: OpenAICompatBackend
-    ):
+    async def test_plan_with_invalid_json_fallback(self, backend: OpenAICompatBackend):
         raw_text = "Click the open button in the toolbar."
         with patch.object(
             backend._client.chat.completions,
@@ -172,9 +174,7 @@ class TestPlan:
 
 
 class TestRetryBehavior:
-    async def test_retry_on_rate_limit_then_success(
-        self, backend: OpenAICompatBackend
-    ):
+    async def test_retry_on_rate_limit_then_success(self, backend: OpenAICompatBackend):
         """Simulate RateLimitError on first call, then success."""
         success_response = _make_chat_response(
             json.dumps({"description": "desktop", "elements": []})
@@ -186,16 +186,16 @@ class TestRetryBehavior:
                     response=SimpleNamespace(
                         status_code=429,
                         headers={"retry-after": "1"},
-                        request=SimpleNamespace(method="POST", url="https://api.openai.com/v1/chat/completions"),
+                        request=SimpleNamespace(
+                            method="POST", url="https://api.openai.com/v1/chat/completions"
+                        ),
                     ),
                     body=None,
                 ),
                 success_response,
             ]
         )
-        with patch.object(
-            backend._client.chat.completions, "create", mock_create
-        ):
+        with patch.object(backend._client.chat.completions, "create", mock_create):
             result = await backend.observe(TINY_PNG)
 
         assert result["description"] == "desktop"
@@ -208,14 +208,17 @@ class TestRetryBehavior:
             response=SimpleNamespace(
                 status_code=429,
                 headers={"retry-after": "1"},
-                request=SimpleNamespace(method="POST", url="https://api.openai.com/v1/chat/completions"),
+                request=SimpleNamespace(
+                    method="POST", url="https://api.openai.com/v1/chat/completions"
+                ),
             ),
             body=None,
         )
         mock_create = AsyncMock(side_effect=rate_limit_error)
-        with patch.object(
-            backend._client.chat.completions, "create", mock_create
-        ), pytest.raises(RateLimitError):
+        with (
+            patch.object(backend._client.chat.completions, "create", mock_create),
+            pytest.raises(RateLimitError),
+        ):
             await backend.observe(TINY_PNG)
 
         # backoff max_tries=5 means up to 5 attempts
@@ -223,11 +226,12 @@ class TestRetryBehavior:
 
 
 class TestMarkdownFenceStripping:
-    async def test_plan_with_markdown_fenced_json(
-        self, backend: OpenAICompatBackend
-    ):
+    async def test_plan_with_markdown_fenced_json(self, backend: OpenAICompatBackend):
         """VLM wraps JSON in ```json fences — should still parse."""
-        fenced_json = '```json\n{"action": {"action_type": "click", "target": "button"}, "reasoning": "test", "done": false, "confidence": 0.8}\n```'
+        fenced_json = (
+            '```json\n{"action": {"action_type": "click", "target": "button"},'
+            ' "reasoning": "test", "done": false, "confidence": 0.8}\n```'
+        )
         with patch.object(
             backend._client.chat.completions,
             "create",
@@ -239,9 +243,7 @@ class TestMarkdownFenceStripping:
         assert result["action"]["action_type"] == "click"
         assert result["confidence"] == 0.8
 
-    async def test_observe_with_markdown_fenced_json(
-        self, backend: OpenAICompatBackend
-    ):
+    async def test_observe_with_markdown_fenced_json(self, backend: OpenAICompatBackend):
         fenced_json = '```json\n{"description": "Desktop window", "elements": []}\n```'
         with patch.object(
             backend._client.chat.completions,
@@ -300,19 +302,11 @@ class TestExtractComputerCalls:
 
 
 class TestCallParameters:
-    async def test_chat_call_passes_correct_parameters(
-        self, backend: OpenAICompatBackend
-    ):
+    async def test_chat_call_passes_correct_parameters(self, backend: OpenAICompatBackend):
         """Verify that _chat_call sends correct model, max_tokens, temperature."""
-        mock_create = AsyncMock(
-            return_value=_make_chat_response("test")
-        )
-        with patch.object(
-            backend._client.chat.completions, "create", mock_create
-        ):
-            await backend._chat_call(
-                [{"role": "user", "content": "hello"}], temperature=0.5
-            )
+        mock_create = AsyncMock(return_value=_make_chat_response("test"))
+        with patch.object(backend._client.chat.completions, "create", mock_create):
+            await backend._chat_call([{"role": "user", "content": "hello"}], temperature=0.5)
 
         mock_create.assert_called_once()
         call_kwargs = mock_create.call_args.kwargs
@@ -326,18 +320,17 @@ class TestCallParameters:
 # ===================================================================
 
 
-from device_use.backends.openai_compat import _supports_computer_use
 from device_use.actions.models import (
     ClickAction,
     DragAction,
     HotkeyAction,
     MoveAction,
-    ScrollAction,
     ScreenshotAction,
+    ScrollAction,
     WaitAction,
     parse_action,
 )
-
+from device_use.backends.openai_compat import _supports_computer_use
 
 # ---------------------------------------------------------------------------
 # _supports_computer_use
@@ -571,9 +564,11 @@ class TestPlanNative:
 
     @pytest.mark.asyncio
     async def test_returns_mapped_action(self, cu_backend):
-        mock_resp = _make_cu_response([
-            {"type": "click", "x": 100, "y": 200, "button": "left"},
-        ])
+        mock_resp = _make_cu_response(
+            [
+                {"type": "click", "x": 100, "y": 200, "button": "left"},
+            ]
+        )
         cu_backend._responses_create = AsyncMock(return_value=mock_resp)
 
         result = await cu_backend._plan_native(b"fake_png", "click the button")
@@ -583,10 +578,12 @@ class TestPlanNative:
 
     @pytest.mark.asyncio
     async def test_batched_actions(self, cu_backend):
-        mock_resp = _make_cu_response([
-            {"type": "click", "x": 10, "y": 20, "button": "left"},
-            {"type": "type", "text": "hello"},
-        ])
+        mock_resp = _make_cu_response(
+            [
+                {"type": "click", "x": 10, "y": 20, "button": "left"},
+                {"type": "type", "text": "hello"},
+            ]
+        )
         cu_backend._responses_create = AsyncMock(return_value=mock_resp)
 
         result = await cu_backend._plan_native(b"fake_png", "type in field")
@@ -670,10 +667,12 @@ class TestCULoopBatched:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return _make_cu_response([
-                    {"type": "click", "x": 10, "y": 20, "button": "left"},
-                    {"type": "type", "text": "hello"},
-                ])
+                return _make_cu_response(
+                    [
+                        {"type": "click", "x": 10, "y": 20, "button": "left"},
+                        {"type": "type", "text": "hello"},
+                    ]
+                )
             return _make_text_response_cu("done")
 
         cu_backend._responses_create = mock_responses_create

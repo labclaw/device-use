@@ -4,24 +4,24 @@ from __future__ import annotations
 
 import io
 import subprocess
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from PIL import Image
 
 from device_use.core.observer import ScreenObserver
-from device_use.core.window_manager import WindowInfo, WindowManager
-
+from device_use.core.window_manager import WindowManager
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def _force_linux_platform(monkeypatch):
     """WindowManager is Linux-only; mock platform so tests run on macOS/Windows."""
     monkeypatch.setattr("device_use.core.window_manager.platform.system", lambda: "Linux")
+
 
 WMCTRL_OUTPUT = """\
 0x04000007  0 0    51  1920 1029 myhost Terminal
@@ -53,13 +53,9 @@ def _mock_subprocess_run(wmctrl_output: str, active_dec_id: int = 0x04000007):
         if cmd == ["which", "wmctrl"] or cmd == ["which", "xdotool"]:
             return subprocess.CompletedProcess(cmd, 0, stdout=b"", stderr=b"")
         if cmd == ["wmctrl", "-l", "-G"]:
-            return subprocess.CompletedProcess(
-                cmd, 0, stdout=wmctrl_output, stderr=""
-            )
+            return subprocess.CompletedProcess(cmd, 0, stdout=wmctrl_output, stderr="")
         if cmd == ["xdotool", "getactivewindow"]:
-            return subprocess.CompletedProcess(
-                cmd, 0, stdout=f"{active_dec_id}\n", stderr=""
-            )
+            return subprocess.CompletedProcess(cmd, 0, stdout=f"{active_dec_id}\n", stderr="")
         if len(cmd) >= 3 and cmd[0] == "wmctrl" and cmd[1] == "-i":
             return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
@@ -97,9 +93,7 @@ class TestWindowManagerListWindows:
 
     @patch("device_use.core.window_manager.subprocess.run")
     def test_list_windows_active_flag(self, mock_run):
-        mock_run.side_effect = _mock_subprocess_run(
-            WMCTRL_OUTPUT, active_dec_id=0x04800003
-        )
+        mock_run.side_effect = _mock_subprocess_run(WMCTRL_OUTPUT, active_dec_id=0x04800003)
         wm = WindowManager()
         windows = wm.list_windows()
         active = [w for w in windows if w.is_active]
@@ -204,17 +198,13 @@ class TestWindowManagerGetRect:
 class TestWindowManagerIsActive:
     @patch("device_use.core.window_manager.subprocess.run")
     def test_is_active_true(self, mock_run):
-        mock_run.side_effect = _mock_subprocess_run(
-            WMCTRL_OUTPUT, active_dec_id=0x04800003
-        )
+        mock_run.side_effect = _mock_subprocess_run(WMCTRL_OUTPUT, active_dec_id=0x04800003)
         wm = WindowManager()
         assert wm.is_window_active("0x4800003") is True
 
     @patch("device_use.core.window_manager.subprocess.run")
     def test_is_active_false(self, mock_run):
-        mock_run.side_effect = _mock_subprocess_run(
-            WMCTRL_OUTPUT, active_dec_id=0x04000007
-        )
+        mock_run.side_effect = _mock_subprocess_run(WMCTRL_OUTPUT, active_dec_id=0x04000007)
         wm = WindowManager()
         assert wm.is_window_active("0x04800003") is False
 

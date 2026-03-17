@@ -9,6 +9,7 @@ Uses the AX (Accessibility) API to:
 This is Layer 3 (A11y) in the operator hierarchy — faster than
 Computer Use (L4) but slower than API (L1) or Script (L2).
 """
+
 from __future__ import annotations
 
 import ctypes
@@ -69,25 +70,25 @@ class AccessibilityOperator(BaseOperator):
     # Framework loading
     # ------------------------------------------------------------------
     def _load_frameworks(self) -> None:
-        self._cf = ctypes.cdll.LoadLibrary(
-            ctypes.util.find_library("CoreFoundation")
-        )
-        self._ax = ctypes.cdll.LoadLibrary(
-            ctypes.util.find_library("ApplicationServices")
-        )
+        self._cf = ctypes.cdll.LoadLibrary(ctypes.util.find_library("CoreFoundation"))
+        self._ax = ctypes.cdll.LoadLibrary(ctypes.util.find_library("ApplicationServices"))
 
         # AX functions
         self._ax.AXUIElementCreateApplication.restype = c_void_p
         self._ax.AXUIElementCreateApplication.argtypes = [c_int32]
         self._ax.AXUIElementCopyAttributeValue.restype = c_int32
         self._ax.AXUIElementCopyAttributeValue.argtypes = [
-            c_void_p, c_void_p, POINTER(c_void_p),
+            c_void_p,
+            c_void_p,
+            POINTER(c_void_p),
         ]
         self._ax.AXUIElementPerformAction.restype = c_int32
         self._ax.AXUIElementPerformAction.argtypes = [c_void_p, c_void_p]
         self._ax.AXUIElementSetAttributeValue.restype = c_int32
         self._ax.AXUIElementSetAttributeValue.argtypes = [
-            c_void_p, c_void_p, c_void_p,
+            c_void_p,
+            c_void_p,
+            c_void_p,
         ]
 
         # CF functions
@@ -95,11 +96,16 @@ class AccessibilityOperator(BaseOperator):
         self._cf.CFRelease.restype = None
         self._cf.CFStringCreateWithCString.restype = c_void_p
         self._cf.CFStringCreateWithCString.argtypes = [
-            c_void_p, ctypes.c_char_p, c_uint32,
+            c_void_p,
+            ctypes.c_char_p,
+            c_uint32,
         ]
         self._cf.CFStringGetCString.restype = ctypes.c_bool
         self._cf.CFStringGetCString.argtypes = [
-            c_void_p, ctypes.c_char_p, ctypes.c_long, c_uint32,
+            c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_long,
+            c_uint32,
         ]
         self._cf.CFGetTypeID.restype = ctypes.c_ulong
         self._cf.CFGetTypeID.argtypes = [c_void_p]
@@ -138,18 +144,14 @@ class AccessibilityOperator(BaseOperator):
         if self._cf.CFGetTypeID(ref) != self._STRING_TYPE_ID:
             return None
         buf = ctypes.create_string_buffer(4096)
-        if self._cf.CFStringGetCString(
-            ref, buf, 4096, self._kCFStringEncodingUTF8
-        ):
+        if self._cf.CFStringGetCString(ref, buf, 4096, self._kCFStringEncodingUTF8):
             return buf.value.decode("utf-8")
         return None
 
     def _get_attr(self, el: c_void_p, name: str) -> tuple[int, c_void_p]:
         val = c_void_p()
         with self._temp_cfstr(name) as cf_name:
-            err = self._ax.AXUIElementCopyAttributeValue(
-                el, cf_name, byref(val)
-            )
+            err = self._ax.AXUIElementCopyAttributeValue(el, cf_name, byref(val))
         return err, val.value
 
     def _get_str(self, el: c_void_p, name: str) -> str | None:
@@ -311,9 +313,7 @@ class AccessibilityOperator(BaseOperator):
                 for child in children_list:
                     self._cf.CFRelease(child)
 
-    def _find_menu_match(
-        self, children: list[c_void_p], name: str
-    ) -> c_void_p | None:
+    def _find_menu_match(self, children: list[c_void_p], name: str) -> c_void_p | None:
         """Find a menu child by title — exact match first, then substring."""
         name_lower = name.lower()
         substring_match = None
@@ -345,9 +345,7 @@ class AccessibilityOperator(BaseOperator):
                             if self._get_str(sub, "AXRole") == "AXToolbar":
                                 with self._iter_children(sub) as btns:
                                     for btn in btns:
-                                        t = self._get_str(
-                                            btn, "AXTitle"
-                                        ) or self._get_str(
+                                        t = self._get_str(btn, "AXTitle") or self._get_str(
                                             btn, "AXDescription"
                                         )
                                         if t:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from device_use.core.models import DeviceProfile
-from device_use.core.result import AgentResult
 from device_use.integrations.labclaw import (
     DeviceDriver,
     DevicePlugin,
@@ -13,7 +12,6 @@ from device_use.integrations.labclaw import (
     GUIDriver,
     create_plugin,
 )
-
 
 # --- Mock VisionBackend ---
 
@@ -142,9 +140,11 @@ class TestDeviceUsePlugin:
         assert driver.is_connected is False
 
     def test_create_driver_with_profile_dict(self, plugin):
-        driver = plugin.create_driver({
-            "profile": {"name": "from-dict", "software": "DictApp"},
-        })
+        driver = plugin.create_driver(
+            {
+                "profile": {"name": "from-dict", "software": "DictApp"},
+            }
+        )
         assert isinstance(driver, GUIDriver)
 
     def test_create_driver_with_explicit_backend(self, profile):
@@ -184,4 +184,5 @@ class TestCreatePlugin:
 async def _mock_capture() -> bytes:
     """Return a minimal valid PNG for testing."""
     from .conftest import _create_minimal_png
+
     return _create_minimal_png()

@@ -42,16 +42,12 @@ class ScreenObserver:
         img.save(buf, format="PNG")
         return buf.getvalue()
 
-    def capture_and_scale(
-        self, window_id: str, max_width: int = 1280
-    ) -> bytes:
+    def capture_and_scale(self, window_id: str, max_width: int = 1280) -> bytes:
         """Capture and scale screenshot for VLM input."""
         raw = self.capture_window(window_id)
         return self.scale_image(raw, max_width)
 
-    async def observe(
-        self, window_id: str, context: str = ""
-    ) -> dict[str, Any]:
+    async def observe(self, window_id: str, context: str = "") -> dict[str, Any]:
         """Capture screenshot and get VLM understanding.
 
         Returns dict with screenshot bytes and VLM description.

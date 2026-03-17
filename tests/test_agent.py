@@ -64,11 +64,13 @@ class TestAgentHistory:
     def test_compact_drops_old_images(self):
         history = AgentHistory(max_images=2)
         for i in range(5):
-            history.add(HistoryEntry(
-                step=i,
-                action={"type": "click"},
-                screenshot=b"img_data",
-            ))
+            history.add(
+                HistoryEntry(
+                    step=i,
+                    action={"type": "click"},
+                    screenshot=b"img_data",
+                )
+            )
         history.compact()
 
         # Only latest 2 should have screenshots
@@ -80,13 +82,15 @@ class TestAgentHistory:
     def test_compact_preserves_text(self):
         history = AgentHistory(max_images=1)
         for i in range(3):
-            history.add(HistoryEntry(
-                step=i,
-                action={"type": "click"},
-                observation=f"Observation {i}",
-                reasoning=f"Reasoning {i}",
-                screenshot=b"img",
-            ))
+            history.add(
+                HistoryEntry(
+                    step=i,
+                    action={"type": "click"},
+                    observation=f"Observation {i}",
+                    reasoning=f"Reasoning {i}",
+                    screenshot=b"img",
+                )
+            )
         history.compact()
 
         # All text preserved
@@ -96,13 +100,15 @@ class TestAgentHistory:
 
     def test_to_messages(self):
         history = AgentHistory()
-        history.add(HistoryEntry(
-            step=0,
-            action={"type": "click"},
-            observation="Saw button",
-            reasoning="Need to click",
-            screenshot=b"img",
-        ))
+        history.add(
+            HistoryEntry(
+                step=0,
+                action={"type": "click"},
+                observation="Saw button",
+                reasoning="Need to click",
+                screenshot=b"img",
+            )
+        )
         messages = history.to_messages()
         assert len(messages) == 1
         assert messages[0]["role"] == "user"
@@ -140,9 +146,7 @@ class TestPromptBuilder:
         assert "CRITICAL" not in prompt  # no hardware warning
 
     def test_system_prompt_hardware(self):
-        profile = DeviceProfile(
-            name="gen5", software="Gen5", hardware_connected=True
-        )
+        profile = DeviceProfile(name="gen5", software="Gen5", hardware_connected=True)
         builder = PromptBuilder(profile)
         prompt = builder.system_prompt()
         assert "physical hardware" in prompt
@@ -150,8 +154,10 @@ class TestPromptBuilder:
 
     def test_system_prompt_includes_elements(self):
         from device_use.core.models import UIElement
+
         profile = DeviceProfile(
-            name="test", software="App",
+            name="test",
+            software="App",
             ui_elements=[UIElement(name="btn", description="A button")],
         )
         builder = PromptBuilder(profile)
@@ -209,7 +215,7 @@ class TestAgentResult:
             actions=actions,
         )
         assert result.action_count == 3
-        assert abs(result.success_rate - 2/3) < 0.01
+        assert abs(result.success_rate - 2 / 3) < 0.01
 
 
 # --- DeviceAgent ---
@@ -220,9 +226,11 @@ class TestDeviceAgent:
     async def test_task_completes_immediately(self):
         """Backend says done on first plan → agent returns success."""
         profile = DeviceProfile(name="test", software="App")
-        backend = MockBackend(plan_responses=[
-            {"done": True, "data": {"result": "image opened"}},
-        ])
+        backend = MockBackend(
+            plan_responses=[
+                {"done": True, "data": {"result": "image opened"}},
+            ]
+        )
         # Need non-empty screenshot for plan to work
         agent = DeviceAgent(profile, backend, max_steps=10)
         # Override _capture_screenshot to return non-empty bytes
@@ -237,21 +245,33 @@ class TestDeviceAgent:
     async def test_task_with_actions(self):
         """Backend plans actions then completes."""
         profile = DeviceProfile(name="test", software="App")
-        backend = MockBackend(plan_responses=[
-            {
-                "reasoning": "Click File menu",
-                "action": {"action_type": "click", "x": 50, "y": 10, "description": "File menu"},
-                "done": False,
-                "confidence": 0.9,
-            },
-            {
-                "reasoning": "Click Open",
-                "action": {"action_type": "click", "x": 50, "y": 40, "description": "Open item"},
-                "done": False,
-                "confidence": 0.8,
-            },
-            {"done": True, "data": {"file": "opened"}},
-        ])
+        backend = MockBackend(
+            plan_responses=[
+                {
+                    "reasoning": "Click File menu",
+                    "action": {
+                        "action_type": "click",
+                        "x": 50,
+                        "y": 10,
+                        "description": "File menu",
+                    },
+                    "done": False,
+                    "confidence": 0.9,
+                },
+                {
+                    "reasoning": "Click Open",
+                    "action": {
+                        "action_type": "click",
+                        "x": 50,
+                        "y": 40,
+                        "description": "Open item",
+                    },
+                    "done": False,
+                    "confidence": 0.8,
+                },
+                {"done": True, "data": {"file": "opened"}},
+            ]
+        )
         agent = DeviceAgent(profile, backend, max_steps=10)
         agent._capture_screenshot = _mock_capture
         # Disable settle delay for fast tests
@@ -265,9 +285,11 @@ class TestDeviceAgent:
     async def test_task_fails(self):
         """Backend returns error → agent reports failure."""
         profile = DeviceProfile(name="test", software="App")
-        backend = MockBackend(plan_responses=[
-            {"done": False, "error": "Cannot find the application window"},
-        ])
+        backend = MockBackend(
+            plan_responses=[
+                {"done": False, "error": "Cannot find the application window"},
+            ]
+        )
         agent = DeviceAgent(profile, backend, max_steps=10)
         agent._capture_screenshot = _mock_capture
         result = await agent.execute("Do something")
@@ -279,14 +301,16 @@ class TestDeviceAgent:
         """Agent hits max_steps → returns failure."""
         profile = DeviceProfile(name="test", software="App")
         # Backend never says done
-        backend = MockBackend(plan_responses=[
-            {
-                "reasoning": "Step action",
-                "action": {"action_type": "wait", "seconds": 0.01},
-                "done": False,
-            }
-            for _ in range(5)
-        ])
+        backend = MockBackend(
+            plan_responses=[
+                {
+                    "reasoning": "Step action",
+                    "action": {"action_type": "wait", "seconds": 0.01},
+                    "done": False,
+                }
+                for _ in range(5)
+            ]
+        )
         agent = DeviceAgent(profile, backend, max_steps=3)
         agent._capture_screenshot = _mock_capture
         agent._executor._settle_delay = 0
@@ -298,37 +322,40 @@ class TestDeviceAgent:
     async def test_history_compaction(self):
         """History compacts old screenshots during execution."""
         profile = DeviceProfile(name="test", software="App")
-        backend = MockBackend(plan_responses=[
-            {
-                "reasoning": f"Step {i}",
-                "action": {"action_type": "wait", "seconds": 0.01},
-                "done": False,
-            }
-            for i in range(8)
-        ] + [{"done": True}])
+        backend = MockBackend(
+            plan_responses=[
+                {
+                    "reasoning": f"Step {i}",
+                    "action": {"action_type": "wait", "seconds": 0.01},
+                    "done": False,
+                }
+                for i in range(8)
+            ]
+            + [{"done": True}]
+        )
         agent = DeviceAgent(profile, backend, max_steps=10, max_images=3)
         agent._capture_screenshot = _mock_capture
         agent._executor._settle_delay = 0
         await agent.execute("Long task")
 
         # History should have entries but only latest 3 with screenshots
-        entries_with_images = [
-            e for e in agent.history.entries if e.screenshot is not None
-        ]
+        entries_with_images = [e for e in agent.history.entries if e.screenshot is not None]
         assert len(entries_with_images) <= 3
 
     @pytest.mark.asyncio
     async def test_invalid_action_continues(self):
         """Invalid action data doesn't crash the agent."""
         profile = DeviceProfile(name="test", software="App")
-        backend = MockBackend(plan_responses=[
-            {
-                "reasoning": "Bad action",
-                "action": {"action_type": "fly_to_moon"},
-                "done": False,
-            },
-            {"done": True},
-        ])
+        backend = MockBackend(
+            plan_responses=[
+                {
+                    "reasoning": "Bad action",
+                    "action": {"action_type": "fly_to_moon"},
+                    "done": False,
+                },
+                {"done": True},
+            ]
+        )
         agent = DeviceAgent(profile, backend, max_steps=10)
         agent._capture_screenshot = _mock_capture
         agent._executor._settle_delay = 0
@@ -343,17 +370,19 @@ class TestBatchedActionStopsOnFailure:
     async def test_remaining_actions_skipped_after_primary_failure(self):
         """If the primary action fails, remaining batched actions are not executed."""
         profile = DeviceProfile(name="test", software="App")
-        backend = MockBackend(plan_responses=[
-            {
-                "reasoning": "Click then type",
-                "action": {"action_type": "click", "x": 50, "y": 50},
-                "done": False,
-                "_remaining_actions": [
-                    {"action": {"action_type": "type", "text": "dangerous"}},
-                ],
-            },
-            {"done": True},
-        ])
+        backend = MockBackend(
+            plan_responses=[
+                {
+                    "reasoning": "Click then type",
+                    "action": {"action_type": "click", "x": 50, "y": 50},
+                    "done": False,
+                    "_remaining_actions": [
+                        {"action": {"action_type": "type", "text": "dangerous"}},
+                    ],
+                },
+                {"done": True},
+            ]
+        )
         agent = DeviceAgent(profile, backend, max_steps=10)
         agent._capture_screenshot = _mock_capture
         agent._executor._settle_delay = 0
@@ -378,18 +407,20 @@ class TestBatchedActionStopsOnFailure:
     async def test_remaining_actions_stop_after_batched_failure(self):
         """If a batched action fails mid-sequence, subsequent ones are skipped."""
         profile = DeviceProfile(name="test", software="App")
-        backend = MockBackend(plan_responses=[
-            {
-                "reasoning": "Three actions",
-                "action": {"action_type": "click", "x": 10, "y": 10},
-                "done": False,
-                "_remaining_actions": [
-                    {"action": {"action_type": "click", "x": 20, "y": 20}},
-                    {"action": {"action_type": "type", "text": "should not run"}},
-                ],
-            },
-            {"done": True},
-        ])
+        backend = MockBackend(
+            plan_responses=[
+                {
+                    "reasoning": "Three actions",
+                    "action": {"action_type": "click", "x": 10, "y": 10},
+                    "done": False,
+                    "_remaining_actions": [
+                        {"action": {"action_type": "click", "x": 20, "y": 20}},
+                        {"action": {"action_type": "type", "text": "should not run"}},
+                    ],
+                },
+                {"done": True},
+            ]
+        )
         agent = DeviceAgent(profile, backend, max_steps=10)
         agent._capture_screenshot = _mock_capture
         agent._executor._settle_delay = 0
@@ -422,11 +453,13 @@ class TestMaxCUTurnsForwarded:
         backend.run_cu_loop = AsyncMock(return_value=[])
 
         agent = DeviceAgent(profile, backend, max_cu_turns=3)
-        asyncio.run(agent.run_cu_loop(
-            task="test task",
-            take_screenshot=AsyncMock(return_value=b"png"),
-            execute_action=AsyncMock(),
-        ))
+        asyncio.run(
+            agent.run_cu_loop(
+                task="test task",
+                take_screenshot=AsyncMock(return_value=b"png"),
+                execute_action=AsyncMock(),
+            )
+        )
 
         backend.run_cu_loop.assert_called_once()
         call_kwargs = backend.run_cu_loop.call_args
@@ -441,11 +474,13 @@ class TestMaxCUTurnsForwarded:
         agent = DeviceAgent(profile, backend)
         assert agent.max_cu_turns == 24
 
-        asyncio.run(agent.run_cu_loop(
-            task="test",
-            take_screenshot=AsyncMock(return_value=b"png"),
-            execute_action=AsyncMock(),
-        ))
+        asyncio.run(
+            agent.run_cu_loop(
+                task="test",
+                take_screenshot=AsyncMock(return_value=b"png"),
+                execute_action=AsyncMock(),
+            )
+        )
 
         assert backend.run_cu_loop.call_args.kwargs["max_turns"] == 24
 
@@ -458,13 +493,17 @@ class TestMaxCUTurnsForwarded:
         agent = DeviceAgent(profile, cu_backend, max_cu_turns=3)
 
         from types import SimpleNamespace
+
         turn_count = 0
 
         async def mock_responses(**kwargs):
             nonlocal turn_count
             turn_count += 1
             action = SimpleNamespace(
-                type="click", x=10, y=20, button="left",
+                type="click",
+                x=10,
+                y=20,
+                button="left",
             )
             call = SimpleNamespace(
                 type="computer_call",
@@ -481,11 +520,13 @@ class TestMaxCUTurnsForwarded:
 
         cu_backend._responses_create = mock_responses
 
-        actions = asyncio.run(agent.run_cu_loop(
-            task="infinite task",
-            take_screenshot=AsyncMock(return_value=b"png"),
-            execute_action=AsyncMock(),
-        ))
+        actions = asyncio.run(
+            agent.run_cu_loop(
+                task="infinite task",
+                take_screenshot=AsyncMock(return_value=b"png"),
+                execute_action=AsyncMock(),
+            )
+        )
 
         # Should have executed exactly 3 turns (one action each)
         assert turn_count == 3
@@ -494,24 +535,25 @@ class TestMaxCUTurnsForwarded:
 
 # Helper — uses _create_minimal_png from conftest
 
+
 async def _mock_capture() -> bytes:
     """Return a minimal valid PNG for testing."""
     import struct
     import zlib
+
     def _create_minimal_png():
-        sig = b'\x89PNG\r\n\x1a\n'
-        ihdr_data = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
-        ihdr_crc = zlib.crc32(b'IHDR' + ihdr_data) & 0xffffffff
-        ihdr = struct.pack('>I', 13) + b'IHDR' + ihdr_data + struct.pack('>I', ihdr_crc)
-        raw = b'\x00\xff\x00\x00'
+        sig = b"\x89PNG\r\n\x1a\n"
+        ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+        ihdr_crc = zlib.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF
+        ihdr = struct.pack(">I", 13) + b"IHDR" + ihdr_data + struct.pack(">I", ihdr_crc)
+        raw = b"\x00\xff\x00\x00"
         compressed = zlib.compress(raw)
-        idat_crc = zlib.crc32(b'IDAT' + compressed) & 0xffffffff
+        idat_crc = zlib.crc32(b"IDAT" + compressed) & 0xFFFFFFFF
         idat = (
-            struct.pack('>I', len(compressed))
-            + b'IDAT' + compressed
-            + struct.pack('>I', idat_crc)
+            struct.pack(">I", len(compressed)) + b"IDAT" + compressed + struct.pack(">I", idat_crc)
         )
-        iend_crc = zlib.crc32(b'IEND') & 0xffffffff
-        iend = struct.pack('>I', 0) + b'IEND' + struct.pack('>I', iend_crc)
+        iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
+        iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
         return sig + ihdr + idat + iend
+
     return _create_minimal_png()

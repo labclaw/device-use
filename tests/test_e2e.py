@@ -10,11 +10,10 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from device_use import DeviceProfile, load_profile, list_profiles
+from device_use import list_profiles, load_profile
 from device_use.core.agent import DeviceAgent
 from device_use.core.result import AgentResult
 
@@ -28,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 async def _mock_capture() -> bytes:
     from .conftest import _create_minimal_png
+
     return _create_minimal_png()
 
 
@@ -43,9 +43,7 @@ class MockBackend:
     """Mock VisionBackend that executes a scripted multi-step plan."""
 
     def __init__(self, plan_responses: list[dict] | None = None):
-        self._plan_responses = plan_responses or [
-            {"done": True, "data": {"status": "completed"}}
-        ]
+        self._plan_responses = plan_responses or [{"done": True, "data": {"status": "completed"}}]
         self._idx = 0
         self.observe_calls = 0
         self.plan_calls = 0
@@ -233,9 +231,7 @@ class TestE2ELabClaw:
         assert plugin.version == "0.1.0"
 
         backend = MockBackend()
-        driver = plugin.create_driver(
-            {"profile": "biotek-gen5", "backend": backend}
-        )
+        driver = plugin.create_driver({"profile": "biotek-gen5", "backend": backend})
         assert not driver.is_connected
 
     @pytest.mark.asyncio
@@ -245,9 +241,7 @@ class TestE2ELabClaw:
 
         plugin = create_plugin()
         backend = MockBackend()
-        driver = plugin.create_driver(
-            {"profile": "imagej-fiji", "backend": backend}
-        )
+        driver = plugin.create_driver({"profile": "imagej-fiji", "backend": backend})
 
         # Connect
         connected = await driver.connect()
@@ -278,9 +272,7 @@ class TestE2ELabClaw:
 
         plugin = create_plugin()
         backend = MockBackend()
-        driver = plugin.create_driver(
-            {"profile": "imagej-fiji", "backend": backend}
-        )
+        driver = plugin.create_driver({"profile": "imagej-fiji", "backend": backend})
 
         result = await driver.write({"task": "Do something"})
         assert result["success"] is False
@@ -403,9 +395,7 @@ class TestE2EErrors:
         """Backend returning error -> agent reports failure."""
         profile = load_profile("imagej-fiji")
         backend = MockBackend(
-            plan_responses=[
-                {"done": False, "error": "Application window not found"}
-            ]
+            plan_responses=[{"done": False, "error": "Application window not found"}]
         )
         agent = DeviceAgent(profile, backend, max_steps=5)
         agent._capture_screenshot = _mock_capture

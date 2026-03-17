@@ -88,7 +88,6 @@ No significant edge effects detected. The blank wells (cols 11-12) show uniform 
 3. **Report in pg/mL**: Convert OD values to IL-6 concentrations using standard curve
 4. **Replicate**: Run in duplicate or triplicate for publication-quality data
 5. **Include positive control**: Add recombinant IL-6 spike-in for method validation""",
-
     "viability": """## Assay Overview
 
 | Parameter | Value |
@@ -150,6 +149,7 @@ class PlateReaderBrain:
         self._use_api = _has_api_key()
         if self._use_api:
             from anthropic import Anthropic
+
             self.client = Anthropic()
         else:
             self.client = None
@@ -193,12 +193,20 @@ class PlateReaderBrain:
 
         if std_wells:
             std_mean = statistics.mean([w.value for w in std_wells])
-            std_cv = (statistics.stdev([w.value for w in std_wells]) / std_mean * 100) if std_mean > 0 else 0
+            std_cv = (
+                (statistics.stdev([w.value for w in std_wells]) / std_mean * 100)
+                if std_mean > 0
+                else 0
+            )
             lines.append(f"Controls (cols 1-2): mean={std_mean:.4f}, CV={std_cv:.1f}%")
 
         if blank_wells:
             blank_mean = statistics.mean([w.value for w in blank_wells])
-            blank_cv = (statistics.stdev([w.value for w in blank_wells]) / blank_mean * 100) if blank_mean > 0 else 0
+            blank_cv = (
+                (statistics.stdev([w.value for w in blank_wells]) / blank_mean * 100)
+                if blank_mean > 0
+                else 0
+            )
             lines.append(f"Blanks (cols 11-12): mean={blank_mean:.4f}, CV={blank_cv:.1f}%")
 
             if std_wells:
@@ -223,8 +231,7 @@ class PlateReaderBrain:
             system=system,
             messages=[{"role": "user", "content": user_message}],
         ) as stream:
-            for text in stream.text_stream:
-                yield text
+            yield from stream.text_stream
 
     def _cached_or_error(self, reading: PlateReading, stream: bool) -> str | Generator[str]:
         # Determine cache key from protocol name

@@ -45,6 +45,7 @@ class PubChemError(Exception):
 # Internal helpers
 # ------------------------------------------------------------------
 
+
 def _fetch_json(url: str) -> dict:
     """GET *url* and return the parsed JSON body.
 
@@ -81,9 +82,8 @@ def _fetch_json(url: str) -> dict:
 
 def _extract_compound(data: dict) -> dict:
     """Pull the first compound record out of a PUG REST response."""
-    compounds = (
-        data.get("PC_Compounds", [])
-        or data.get("InformationList", {}).get("Information", [])
+    compounds = data.get("PC_Compounds", []) or data.get("InformationList", {}).get(
+        "Information", []
     )
     if not compounds:
         raise PubChemError("No compound records in PubChem response")
@@ -122,6 +122,7 @@ def _get_properties(cid: int) -> dict[str, Any]:
 # ------------------------------------------------------------------
 # Public tool class
 # ------------------------------------------------------------------
+
 
 class PubChemTool(BaseTool):
     """Look up compounds on PubChem via PUG REST.
@@ -170,9 +171,7 @@ class PubChemTool(BaseTool):
             return self.lookup_by_name(str(kwargs["name"]))
         if "formula" in kwargs:
             return self.lookup_by_formula(str(kwargs["formula"]))
-        raise ValueError(
-            "PubChemTool.execute() requires one of: cid, name, formula"
-        )
+        raise ValueError("PubChemTool.execute() requires one of: cid, name, formula")
 
     # -- Lookup methods ----------------------------------------------------
 
@@ -240,11 +239,7 @@ class PubChemTool(BaseTool):
         formula = props.get("MolecularFormula", "N/A")
         weight = props.get("MolecularWeight", "N/A")
         # PUG REST may return the key as "CanonicalSMILES" or "SMILES"
-        smiles = (
-            props.get("CanonicalSMILES")
-            or props.get("SMILES")
-            or "N/A"
-        )
+        smiles = props.get("CanonicalSMILES") or props.get("SMILES") or "N/A"
         inchi = props.get("InChI", "N/A")
         inchi_key = props.get("InChIKey", "N/A")
 

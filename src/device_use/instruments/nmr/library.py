@@ -17,7 +17,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from device_use.instruments.nmr.processor import NMRPeak, NMRSpectrum
+from device_use.instruments.nmr.processor import NMRSpectrum
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LibraryEntry:
     """A reference compound in the spectral library."""
+
     name: str
     peaks: list[float]  # sorted ppm positions
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -33,6 +34,7 @@ class LibraryEntry:
 @dataclass
 class MatchResult:
     """Result of matching a spectrum against the library."""
+
     entry: LibraryEntry
     score: float  # 0.0 to 1.0 (Jaccard similarity)
     matched_peaks: int
@@ -52,11 +54,13 @@ class SpectralLibrary:
 
     def add(self, name: str, peaks: list[float], **metadata: Any) -> None:
         """Add a compound to the library."""
-        self._entries.append(LibraryEntry(
-            name=name,
-            peaks=sorted(peaks),
-            metadata=metadata,
-        ))
+        self._entries.append(
+            LibraryEntry(
+                name=name,
+                peaks=sorted(peaks),
+                metadata=metadata,
+            )
+        )
 
     def add_spectrum(self, spectrum: NMRSpectrum, name: str = "", **metadata: Any) -> None:
         """Add a processed NMR spectrum to the library."""
@@ -77,12 +81,14 @@ class SpectralLibrary:
         results = []
         for entry in self._entries:
             score, matched = self._jaccard(query_peaks, entry.peaks)
-            results.append(MatchResult(
-                entry=entry,
-                score=score,
-                matched_peaks=matched,
-                total_peaks=len(set(query_peaks) | set(entry.peaks)),
-            ))
+            results.append(
+                MatchResult(
+                    entry=entry,
+                    score=score,
+                    matched_peaks=matched,
+                    total_peaks=len(set(query_peaks) | set(entry.peaks)),
+                )
+            )
 
         results.sort(key=lambda r: r.score, reverse=True)
         return results[:top_k]
@@ -131,6 +137,7 @@ class SpectralLibrary:
 
         # Find available datasets
         from pathlib import Path
+
         examdata = Path("/opt/topspin5.0.0/examdata")
         if not examdata.exists():
             logger.warning("TopSpin examdata not found at %s", examdata)

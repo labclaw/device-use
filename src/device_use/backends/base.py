@@ -22,9 +22,7 @@ class VisionBackend(Protocol):
         """
         ...
 
-    async def observe(
-        self, screenshot: bytes, context: str = ""
-    ) -> dict[str, Any]:
+    async def observe(self, screenshot: bytes, context: str = "") -> dict[str, Any]:
         """Describe what's visible on screen.
 
         Args:
@@ -55,9 +53,7 @@ class VisionBackend(Protocol):
         """
         ...
 
-    async def locate(
-        self, screenshot: bytes, element_description: str
-    ) -> tuple[int, int] | None:
+    async def locate(self, screenshot: bytes, element_description: str) -> tuple[int, int] | None:
         """Find coordinates of a UI element by description.
 
         Args:

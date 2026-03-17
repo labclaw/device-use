@@ -14,7 +14,6 @@ import csv
 import io
 import logging
 import random
-from pathlib import Path
 from typing import Any
 
 from device_use.instruments.base import BaseInstrument, ControlMode, InstrumentInfo
@@ -30,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Demo data for offline mode ───────────────────────────────────────────
+
 
 def _generate_demo_absorbance(wavelength: int = 450) -> PlateReading:
     """Generate realistic absorbance data for a 96-well ELISA plate.
@@ -137,6 +137,7 @@ _DEMO_DATASETS = [
 
 # ── Adapter ──────────────────────────────────────────────────────────────
 
+
 class PlateReaderAdapter(BaseInstrument):
     """Multi-mode plate reader adapter.
 
@@ -226,9 +227,7 @@ class PlateReaderAdapter(BaseInstrument):
         """Return demo plate reading data."""
         if "viability" in dataset_name.lower() or "cell" in dataset_name.lower():
             return _generate_demo_fluorescence()
-        return _generate_demo_absorbance(
-            wavelength=kwargs.get("wavelength_nm", 450)
-        )
+        return _generate_demo_absorbance(wavelength=kwargs.get("wavelength_nm", 450))
 
     # -- CSV export --------------------------------------------------------
 
@@ -239,11 +238,13 @@ class PlateReaderAdapter(BaseInstrument):
         writer = csv.writer(output)
 
         # Header
-        writer.writerow([
-            f"Protocol: {reading.protocol}",
-            f"Mode: {reading.mode.value}",
-            f"Wavelength: {reading.wavelength_nm}nm",
-        ])
+        writer.writerow(
+            [
+                f"Protocol: {reading.protocol}",
+                f"Mode: {reading.mode.value}",
+                f"Wavelength: {reading.wavelength_nm}nm",
+            ]
+        )
         writer.writerow([])
 
         # Find dimensions
@@ -268,6 +269,4 @@ class PlateReaderAdapter(BaseInstrument):
     def _ensure_connected(self) -> None:
         if not self._connected:
             if not self.connect():
-                raise RuntimeError(
-                    f"Failed to connect PlateReader in {self._mode.value} mode"
-                )
+                raise RuntimeError(f"Failed to connect PlateReader in {self._mode.value} mode")

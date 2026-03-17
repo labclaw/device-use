@@ -15,7 +15,6 @@ Run:
 from __future__ import annotations
 
 import base64
-import io
 import json
 import logging
 import sys
@@ -26,7 +25,6 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 
 warnings.filterwarnings("ignore", category=UserWarning, module="nmrglue")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy")
@@ -34,7 +32,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy")
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from device_use.instruments.nmr.adapter import TopSpinAdapter
-from device_use.instruments.nmr.processor import NMRProcessor
 from device_use.instruments.plate_reader import PlateReaderAdapter
 from device_use.orchestrator import Orchestrator
 
@@ -76,6 +73,7 @@ def _get_orchestrator() -> Orchestrator:
 
 
 # ── API Endpoints ──────────────────────────────────────────────
+
 
 @app.get("/api/status")
 def get_status():
@@ -212,10 +210,7 @@ def list_tools():
 
     tools = get_available_tools()
     return {
-        "tools": [
-            {"name": t.name, "description": t.description}
-            for t in tools
-        ],
+        "tools": [{"name": t.name, "description": t.description} for t in tools],
         "count": len(tools),
     }
 
@@ -227,23 +222,44 @@ def get_architecture():
 
     return {
         "layers": [
-            {"name": "Cloud Brain", "components": ["Claude AI", "GPT", "Gemini"],
-             "status": "active"},
-            {"name": "device-use middleware", "components": ["Orchestrator", "Event System"],
-             "status": "active"},
-            {"name": "Instruments", "components": [
-                {"name": "TopSpin NMR", "modes": ["API", "GUI", "Offline"], "status": "connected"},
-                {"name": "Plate Reader", "modes": ["Offline", "API", "GUI"], "status": "connected"},
-            ]},
-            {"name": "Tools", "components": [
-                {"name": "PubChem", "status": "active"},
-                {"name": "ToolUniverse", "status": "active" if _TU_AVAILABLE else "available"},
-            ]},
+            {
+                "name": "Cloud Brain",
+                "components": ["Claude AI", "GPT", "Gemini"],
+                "status": "active",
+            },
+            {
+                "name": "device-use middleware",
+                "components": ["Orchestrator", "Event System"],
+                "status": "active",
+            },
+            {
+                "name": "Instruments",
+                "components": [
+                    {
+                        "name": "TopSpin NMR",
+                        "modes": ["API", "GUI", "Offline"],
+                        "status": "connected",
+                    },
+                    {
+                        "name": "Plate Reader",
+                        "modes": ["Offline", "API", "GUI"],
+                        "status": "connected",
+                    },
+                ],
+            },
+            {
+                "name": "Tools",
+                "components": [
+                    {"name": "PubChem", "status": "active"},
+                    {"name": "ToolUniverse", "status": "active" if _TU_AVAILABLE else "available"},
+                ],
+            },
         ],
     }
 
 
 # ── Plate Reader API ──────────────────────────────────────────
+
 
 @app.get("/api/plate-reader/datasets")
 def plate_reader_datasets():
@@ -280,6 +296,7 @@ def plate_reader_process(name: str):
 
     # Generate heatmap plot
     from device_use.instruments.plate_reader.visualizer import plot_plate_heatmap
+
     png_bytes = plot_plate_heatmap(reading, output_path=None)
     plot_b64 = base64.b64encode(png_bytes).decode()
 
@@ -309,6 +326,7 @@ def plate_reader_analyze(name: str):
     reading = reader.process(name)
 
     from device_use.instruments.plate_reader.brain import PlateReaderBrain
+
     brain = PlateReaderBrain()
 
     def event_stream():
@@ -326,6 +344,7 @@ def plate_reader_analyze(name: str):
 
 
 # ── Frontend ──────────────────────────────────────────────────
+
 
 @app.get("/", response_class=HTMLResponse)
 def index():

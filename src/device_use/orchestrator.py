@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from device_use.instruments.base import BaseInstrument, InstrumentInfo
 
@@ -31,8 +32,10 @@ logger = logging.getLogger(__name__)
 # Events
 # ---------------------------------------------------------------------------
 
+
 class EventType(str, Enum):
     """Event types emitted during pipeline execution."""
+
     PIPELINE_START = "pipeline_start"
     PIPELINE_END = "pipeline_end"
     STEP_START = "step_start"
@@ -46,6 +49,7 @@ class EventType(str, Enum):
 @dataclass
 class Event:
     """An event emitted during orchestration."""
+
     event_type: EventType
     data: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
@@ -62,6 +66,7 @@ StepHook = Callable[["PipelineStep", dict[str, Any]], None]
 # Tool Registry
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ToolSpec:
     """A tool that can be called by the brain.
@@ -69,6 +74,7 @@ class ToolSpec:
     Tools wrap instrument capabilities (e.g. "nmr.process", "nmr.list_datasets")
     into a flat namespace the brain can reference.
     """
+
     name: str
     description: str
     handler: Callable[..., Any]
@@ -108,31 +114,39 @@ class ToolRegistry:
         # Auto-register standard BaseInstrument methods as tools
         prefix = info.name.lower().replace(" ", "_")
 
-        self._register_tool(ToolSpec(
-            name=f"{prefix}.list_datasets",
-            description=f"List available datasets on {info.name}",
-            handler=instrument.list_datasets,
-            instrument_type=info.instrument_type,
-        ))
-        self._register_tool(ToolSpec(
-            name=f"{prefix}.acquire",
-            description=f"Acquire data from {info.name}",
-            handler=instrument.acquire,
-            instrument_type=info.instrument_type,
-            parameters={"kwargs": "Acquisition parameters"},
-        ))
-        self._register_tool(ToolSpec(
-            name=f"{prefix}.process",
-            description=f"Process data from {info.name}",
-            handler=instrument.process,
-            instrument_type=info.instrument_type,
-            parameters={"data_path": "Path to raw data"},
-        ))
+        self._register_tool(
+            ToolSpec(
+                name=f"{prefix}.list_datasets",
+                description=f"List available datasets on {info.name}",
+                handler=instrument.list_datasets,
+                instrument_type=info.instrument_type,
+            )
+        )
+        self._register_tool(
+            ToolSpec(
+                name=f"{prefix}.acquire",
+                description=f"Acquire data from {info.name}",
+                handler=instrument.acquire,
+                instrument_type=info.instrument_type,
+                parameters={"kwargs": "Acquisition parameters"},
+            )
+        )
+        self._register_tool(
+            ToolSpec(
+                name=f"{prefix}.process",
+                description=f"Process data from {info.name}",
+                handler=instrument.process,
+                instrument_type=info.instrument_type,
+                parameters={"data_path": "Path to raw data"},
+            )
+        )
 
-        self._emit(Event(
-            event_type=EventType.INSTRUMENT_REGISTERED,
-            data={"instrument": info.name, "type": info.instrument_type},
-        ))
+        self._emit(
+            Event(
+                event_type=EventType.INSTRUMENT_REGISTERED,
+                data={"instrument": info.name, "type": info.instrument_type},
+            )
+        )
         logger.info("Registered instrument: %s (%s)", info.name, info.instrument_type)
 
     def _register_tool(self, spec: ToolSpec) -> None:
@@ -166,6 +180,7 @@ class ToolRegistry:
 # Pipeline
 # ---------------------------------------------------------------------------
 
+
 class StepStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
@@ -177,6 +192,7 @@ class StepStatus(str, Enum):
 @dataclass
 class StepResult:
     """Result of executing a single pipeline step."""
+
     status: StepStatus
     output: Any = None
     error: str = ""
@@ -199,6 +215,7 @@ class PipelineStep:
     Use ``retries`` for automatic retry on failure (e.g. flaky instrument
     connections).  Use ``timeout_s`` to cap execution time.
     """
+
     name: str
     description: str = ""
     tool_name: str = ""  # registered tool to call
@@ -213,20 +230,23 @@ class PipelineStep:
 @dataclass
 class PipelineResult:
     """Result of running an entire pipeline."""
+
     name: str
     steps: list[tuple[str, StepResult]] = field(default_factory=list)  # (step_name, result)
     duration_ms: float = 0
 
     @property
     def success(self) -> bool:
-        return all(r.status in (StepStatus.COMPLETED, StepStatus.SKIPPED)
-                   for _, r in self.steps)
+        return all(r.status in (StepStatus.COMPLETED, StepStatus.SKIPPED) for _, r in self.steps)
 
     @property
     def outputs(self) -> dict[str, Any]:
         """Map of step_name -> output for all completed steps."""
-        return {name: r.output for name, r in self.steps
-                if r.status == StepStatus.COMPLETED and r.output is not None}
+        return {
+            name: r.output
+            for name, r in self.steps
+            if r.status == StepStatus.COMPLETED and r.output is not None
+        }
 
     @property
     def last_output(self) -> Any:
@@ -337,7 +357,9 @@ class Pipeline:
 
             if len(batch) > 1:
                 # Parallel group
-                lines.append(f"  {'├' if not is_last_batch else '└'}── parallel [{batch[0].parallel}]:")
+                lines.append(
+                    f"  {'├' if not is_last_batch else '└'}── parallel [{batch[0].parallel}]:"
+                )
                 prefix = "  │   " if not is_last_batch else "      "
                 for si, step in enumerate(batch):
                     branch = "├" if si < len(batch) - 1 else "└"
@@ -367,6 +389,7 @@ class Pipeline:
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
+
 
 class Orchestrator:
     """The main coordinator — connects brains to instruments via pipelines.
@@ -453,10 +476,12 @@ class Orchestrator:
             ok = inst.connect()
             results[info.name] = ok
             if ok:
-                self._emit(Event(
-                    event_type=EventType.INSTRUMENT_CONNECTED,
-                    data={"instrument": info.name},
-                ))
+                self._emit(
+                    Event(
+                        event_type=EventType.INSTRUMENT_CONNECTED,
+                        data={"instrument": info.name},
+                    )
+                )
                 logger.info("Connected: %s", info.name)
             else:
                 logger.warning("Failed to connect: %s", info.name)
@@ -469,13 +494,13 @@ class Orchestrator:
         spec = self.registry.get_tool(tool_name)
         if spec is None:
             available = [t.name for t in self.registry.list_tools()]
-            raise KeyError(
-                f"Tool {tool_name!r} not found. Available: {available}"
+            raise KeyError(f"Tool {tool_name!r} not found. Available: {available}")
+        self._emit(
+            Event(
+                event_type=EventType.TOOL_CALLED,
+                data={"tool": tool_name, "params": kwargs},
             )
-        self._emit(Event(
-            event_type=EventType.TOOL_CALLED,
-            data={"tool": tool_name, "params": kwargs},
-        ))
+        )
         return spec.handler(**kwargs)
 
     # -- Pipeline execution --
@@ -493,10 +518,12 @@ class Orchestrator:
         Steps with the same ``parallel`` group name run concurrently using
         a thread pool.  Steps without a parallel group run sequentially.
         """
-        self._emit(Event(
-            event_type=EventType.PIPELINE_START,
-            data={"pipeline": pipeline.name, "steps": len(pipeline)},
-        ))
+        self._emit(
+            Event(
+                event_type=EventType.PIPELINE_START,
+                data={"pipeline": pipeline.name, "steps": len(pipeline)},
+            )
+        )
 
         context: dict[str, Any] = {}
         result = PipelineResult(name=pipeline.name)
@@ -531,14 +558,16 @@ class Orchestrator:
 
         result.duration_ms = (time.monotonic() - pipeline_start) * 1000
 
-        self._emit(Event(
-            event_type=EventType.PIPELINE_END,
-            data={
-                "pipeline": pipeline.name,
-                "success": result.success,
-                "duration_ms": result.duration_ms,
-            },
-        ))
+        self._emit(
+            Event(
+                event_type=EventType.PIPELINE_END,
+                data={
+                    "pipeline": pipeline.name,
+                    "success": result.success,
+                    "duration_ms": result.duration_ms,
+                },
+            )
+        )
         return result
 
     @staticmethod
@@ -552,8 +581,9 @@ class Orchestrator:
                 batches.append([step])
         return batches
 
-    def _run_hooks(self, hooks: list[StepHook], step: PipelineStep,
-                   context: dict[str, Any]) -> None:
+    def _run_hooks(
+        self, hooks: list[StepHook], step: PipelineStep, context: dict[str, Any]
+    ) -> None:
         """Run a list of hooks. Raises on first failure."""
         for hook in hooks:
             hook(step, context)
@@ -571,14 +601,18 @@ class Orchestrator:
             self._run_hooks(self._pre_hooks, step, context)
         except Exception as exc:
             logger.error("Pre-hook failed for step %s: %s", step.name, exc)
-            return StepResult(status=StepStatus.FAILED,
-                              error=f"pre-hook: {exc}")
+            return StepResult(status=StepStatus.FAILED, error=f"pre-hook: {exc}")
 
-        self._emit(Event(
-            event_type=EventType.STEP_START,
-            data={"pipeline": pipeline_name, "step": step.name,
-                  "description": step.description},
-        ))
+        self._emit(
+            Event(
+                event_type=EventType.STEP_START,
+                data={
+                    "pipeline": pipeline_name,
+                    "step": step.name,
+                    "description": step.description,
+                },
+            )
+        )
 
         attempts = 1 + step.retries
         last_error = ""
@@ -586,8 +620,7 @@ class Orchestrator:
 
         for attempt in range(attempts):
             if attempt > 0:
-                logger.info("Retrying step %s (attempt %d/%d)",
-                            step.name, attempt + 1, attempts)
+                logger.info("Retrying step %s (attempt %d/%d)", step.name, attempt + 1, attempts)
 
             try:
                 output = self._execute_step_with_timeout(step, context)
@@ -597,42 +630,53 @@ class Orchestrator:
                 try:
                     self._run_hooks(self._post_hooks, step, context)
                 except Exception as exc:
-                    logger.error("Post-hook failed for step %s: %s",
-                                 step.name, exc)
-                    return StepResult(status=StepStatus.FAILED,
-                                      error=f"post-hook: {exc}",
-                                      duration_ms=duration_ms)
+                    logger.error("Post-hook failed for step %s: %s", step.name, exc)
+                    return StepResult(
+                        status=StepStatus.FAILED, error=f"post-hook: {exc}", duration_ms=duration_ms
+                    )
 
-                self._emit(Event(
-                    event_type=EventType.STEP_END,
-                    data={"pipeline": pipeline_name, "step": step.name,
-                          "duration_ms": duration_ms,
-                          "attempts": attempt + 1},
-                ))
-                logger.info("Completed step: %s (%.0fms, attempt %d)",
-                            step.name, duration_ms, attempt + 1)
-                return StepResult(status=StepStatus.COMPLETED, output=output,
-                                  duration_ms=duration_ms)
+                self._emit(
+                    Event(
+                        event_type=EventType.STEP_END,
+                        data={
+                            "pipeline": pipeline_name,
+                            "step": step.name,
+                            "duration_ms": duration_ms,
+                            "attempts": attempt + 1,
+                        },
+                    )
+                )
+                logger.info(
+                    "Completed step: %s (%.0fms, attempt %d)", step.name, duration_ms, attempt + 1
+                )
+                return StepResult(
+                    status=StepStatus.COMPLETED, output=output, duration_ms=duration_ms
+                )
             except Exception as exc:
                 last_error = str(exc)
                 if attempt < attempts - 1:
-                    logger.warning("Step %s attempt %d failed: %s",
-                                   step.name, attempt + 1, exc)
+                    logger.warning("Step %s attempt %d failed: %s", step.name, attempt + 1, exc)
                     continue
 
         duration_ms = (time.monotonic() - step_start) * 1000
-        self._emit(Event(
-            event_type=EventType.STEP_ERROR,
-            data={"pipeline": pipeline_name, "step": step.name,
-                  "error": last_error, "attempts": attempts},
-        ))
-        logger.error("Step %s failed after %d attempts: %s",
-                     step.name, attempts, last_error)
-        return StepResult(status=StepStatus.FAILED, error=last_error,
-                              duration_ms=duration_ms)
+        self._emit(
+            Event(
+                event_type=EventType.STEP_ERROR,
+                data={
+                    "pipeline": pipeline_name,
+                    "step": step.name,
+                    "error": last_error,
+                    "attempts": attempts,
+                },
+            )
+        )
+        logger.error("Step %s failed after %d attempts: %s", step.name, attempts, last_error)
+        return StepResult(status=StepStatus.FAILED, error=last_error, duration_ms=duration_ms)
 
     def _run_parallel_batch(
-        self, batch: list[PipelineStep], context: dict[str, Any],
+        self,
+        batch: list[PipelineStep],
+        context: dict[str, Any],
         pipeline_name: str,
     ) -> list[StepResult]:
         """Run a batch of steps concurrently in a thread pool."""
@@ -644,23 +688,19 @@ class Orchestrator:
             results[idx] = self._run_single_step(step, context, pipeline_name)
 
         with ThreadPoolExecutor(max_workers=len(batch)) as pool:
-            futures = [
-                pool.submit(_run_one, i, step)
-                for i, step in enumerate(batch)
-            ]
+            futures = [pool.submit(_run_one, i, step) for i, step in enumerate(batch)]
             for f in futures:
                 f.result()  # propagate exceptions
 
         return results  # type: ignore[return-value]
 
-    def _execute_step_with_timeout(
-        self, step: PipelineStep, context: dict[str, Any]
-    ) -> Any:
+    def _execute_step_with_timeout(self, step: PipelineStep, context: dict[str, Any]) -> Any:
         """Execute a step, enforcing timeout_s if set."""
         if step.timeout_s <= 0:
             return self._execute_step(step, context)
 
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import TimeoutError as FuturesTimeout
 
         with ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(self._execute_step, step, context)
@@ -668,9 +708,7 @@ class Orchestrator:
                 return future.result(timeout=step.timeout_s)
             except FuturesTimeout:
                 future.cancel()
-                raise TimeoutError(
-                    f"Step {step.name!r} timed out after {step.timeout_s}s"
-                )
+                raise TimeoutError(f"Step {step.name!r} timed out after {step.timeout_s}s")
 
     def _execute_step(self, step: PipelineStep, context: dict[str, Any]) -> Any:
         """Execute a single step, resolving tool or inline handler.
@@ -689,14 +727,10 @@ class Orchestrator:
             # Inline handler — pass context as first arg
             return step.handler(context, **params)
 
-        raise ValueError(
-            f"Step {step.name!r} has neither tool_name nor handler"
-        )
+        raise ValueError(f"Step {step.name!r} has neither tool_name nor handler")
 
     @staticmethod
-    def _resolve_params(
-        params: dict[str, Any], context: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _resolve_params(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         """Resolve param values against pipeline context.
 
         String values matching "{step_name}" are replaced with the output

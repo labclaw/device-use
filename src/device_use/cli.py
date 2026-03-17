@@ -16,9 +16,7 @@ def main():
     subparsers.add_parser("list-profiles", help="Show available device profiles")
 
     # run
-    run_parser = subparsers.add_parser(
-        "run", help="Execute a task on instrument software"
-    )
+    run_parser = subparsers.add_parser("run", help="Execute a task on instrument software")
     run_parser.add_argument("task", help="Task description")
     run_parser.add_argument(
         "--profile", "-p", required=True, help="Device profile name or YAML path"
@@ -31,17 +29,11 @@ def main():
         help="VLM backend",
     )
     run_parser.add_argument("--model", "-m", help="Model name override")
-    run_parser.add_argument(
-        "--max-steps", type=int, default=30, help="Maximum agent steps"
-    )
+    run_parser.add_argument("--max-steps", type=int, default=30, help="Maximum agent steps")
 
     # interactive
-    interactive_parser = subparsers.add_parser(
-        "interactive", help="Interactive REPL mode"
-    )
-    interactive_parser.add_argument(
-        "--profile", "-p", required=True, help="Device profile"
-    )
+    interactive_parser = subparsers.add_parser("interactive", help="Interactive REPL mode")
+    interactive_parser.add_argument("--profile", "-p", required=True, help="Device profile")
     interactive_parser.add_argument(
         "--backend",
         "-b",
@@ -51,14 +43,10 @@ def main():
     interactive_parser.add_argument("--model", "-m", help="Model name override")
 
     # instruments — middleware layer
-    subparsers.add_parser(
-        "instruments", help="List registered instruments and tools"
-    )
+    subparsers.add_parser("instruments", help="List registered instruments and tools")
 
     # status — architecture overview
-    subparsers.add_parser(
-        "status", help="Show architecture status and connections"
-    )
+    subparsers.add_parser("status", help="Show architecture status and connections")
 
     # demo — run a demo pipeline
     demo_parser = subparsers.add_parser(
@@ -76,9 +64,7 @@ def main():
     scaffold_parser = subparsers.add_parser(
         "scaffold", help="Generate a new device package (collection)"
     )
-    scaffold_parser.add_argument(
-        "device_name", help="Device name (e.g. 'zeiss-zen', 'flowjo')"
-    )
+    scaffold_parser.add_argument("device_name", help="Device name (e.g. 'zeiss-zen', 'flowjo')")
     scaffold_parser.add_argument(
         "--output", "-o", default=".", help="Output directory (default: current)"
     )
@@ -139,10 +125,7 @@ async def _run(args):
     backend = _create_backend(args)
     agent = DeviceAgent(profile, backend, max_steps=args.max_steps)
 
-    print(
-        f"Profile: {profile.name} "
-        f"({'hardware' if profile.hardware_connected else 'software'})"
-    )
+    print(f"Profile: {profile.name} ({'hardware' if profile.hardware_connected else 'software'})")
     print(f"Task: {args.task}")
     print(f"Backend: {args.backend}")
     print("-" * 50)
@@ -197,7 +180,7 @@ def _instruments():
 
     print(f"\nInstruments ({len(instruments)}):")
     print(f"  {'Name':<18} {'Vendor':<10} {'Type':<14} {'Modes'}")
-    print(f"  {'-'*60}")
+    print(f"  {'-' * 60}")
     for inst in instruments:
         modes = ", ".join(m.value for m in inst.supported_modes)
         print(f"  {inst.name:<18} {inst.vendor:<10} {inst.instrument_type:<14} {modes}")
@@ -220,6 +203,7 @@ def _status():
 
     # Cloud Brain
     import os
+
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
     brain_status = "ready" if has_key else "demo mode (no API key)"
     print(f"  Cloud Brain:     {brain_status}")
@@ -229,7 +213,7 @@ def _status():
     print(f"  Orchestrator:    {len(orch.registry.list_tools())} tools registered")
 
     # Instruments
-    print(f"\n  Instruments:")
+    print("\n  Instruments:")
     for info in orch.registry.list_instruments():
         inst = orch.registry.get_instrument(info.name)
         status = "connected" if inst.connected else "offline"
@@ -237,15 +221,15 @@ def _status():
         print(f"    {info.name:<16} {info.vendor:<10} [{modes}] {status}")
 
     # External tools
-    print(f"\n  External Tools:")
-    print(f"    PubChem        NCBI PUG REST      active")
+    print("\n  External Tools:")
+    print("    PubChem        NCBI PUG REST      active")
     tu_status = "active" if _TU_AVAILABLE else "install: pip install tooluniverse"
     print(f"    ToolUniverse   Harvard (600+)     {tu_status}")
 
     # Stats
     tools = orch.registry.list_tools()
     print(f"\n  Total tools: {len(tools)}")
-    print(f"  Control modes: API (gRPC) | GUI (Computer Use) | Offline (local)")
+    print("  Control modes: API (gRPC) | GUI (Computer Use) | Offline (local)")
     print()
 
 
@@ -268,7 +252,9 @@ def _scaffold(device_name: str, output_dir: str):
 
     slug = device_name.lower().replace("-", "_").replace(" ", "_")
     pkg_name = f"device_use_{slug}"
-    class_name = "".join(w.capitalize() for w in device_name.replace("-", " ").replace("_", " ").split())
+    class_name = "".join(
+        w.capitalize() for w in device_name.replace("-", " ").replace("_", " ").split()
+    )
     root = os.path.join(output_dir, pkg_name)
 
     if os.path.exists(root):
@@ -287,7 +273,9 @@ def _scaffold(device_name: str, output_dir: str):
         os.makedirs(d, exist_ok=True)
 
     # pyproject.toml
-    _write(f"{root}/pyproject.toml", f'''[build-system]
+    _write(
+        f"{root}/pyproject.toml",
+        f'''[build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
@@ -303,10 +291,13 @@ dependencies = ["device-use"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/{pkg_name}"]
-''')
+''',
+    )
 
     # Main __init__.py with adapter factory
-    _write(f"{root}/src/{pkg_name}/__init__.py", f'''"""device-use adapter for {device_name}."""
+    _write(
+        f"{root}/src/{pkg_name}/__init__.py",
+        f'''"""device-use adapter for {device_name}."""
 
 from {pkg_name}.adapter import {class_name}Adapter
 
@@ -317,10 +308,13 @@ def create_adapter(control_mode):
 
 
 __all__ = ["{class_name}Adapter", "create_adapter"]
-''')
+''',
+    )
 
     # Adapter skeleton
-    _write(f"{root}/src/{pkg_name}/adapter.py", f'''"""Adapter for {device_name} — implements BaseInstrument."""
+    _write(
+        f"{root}/src/{pkg_name}/adapter.py",
+        f'''"""Adapter for {device_name} — implements BaseInstrument."""
 
 from __future__ import annotations
 
@@ -373,10 +367,13 @@ class {class_name}Adapter(BaseInstrument):
     def process(self, data_path, **kwargs):
         # TODO: Process raw data
         raise NotImplementedError("Processing not yet implemented")
-''')
+''',
+    )
 
     # MCP server
-    _write(f"{root}/mcp/server.py", f'''"""MCP server for {device_name} — Claude Code integration."""
+    _write(
+        f"{root}/mcp/server.py",
+        f'''"""MCP server for {device_name} — Claude Code integration."""
 
 from mcp.server.fastmcp import FastMCP
 
@@ -396,10 +393,13 @@ def list_datasets() -> str:
 
 if __name__ == "__main__":
     mcp.run()
-''')
+''',
+    )
 
     # Example script
-    _write(f"{root}/examples/quickstart.py", f'''"""Quick start — process data with {device_name}."""
+    _write(
+        f"{root}/examples/quickstart.py",
+        f'''"""Quick start — process data with {device_name}."""
 
 from device_use import create_orchestrator
 
@@ -414,10 +414,13 @@ def main():
 
 if __name__ == "__main__":
     main()
-''')
+''',
+    )
 
     # Test skeleton
-    _write(f"{root}/tests/test_adapter.py", f'''"""Tests for {class_name}Adapter."""
+    _write(
+        f"{root}/tests/test_adapter.py",
+        f'''"""Tests for {class_name}Adapter."""
 
 from {pkg_name} import {class_name}Adapter, create_adapter
 from device_use.instruments.base import ControlMode
@@ -438,10 +441,13 @@ class Test{class_name}Adapter:
     def test_create_adapter_factory(self):
         adapter = create_adapter(ControlMode.OFFLINE)
         assert adapter.mode == ControlMode.OFFLINE
-''')
+''',
+    )
 
     # README
-    _write(f"{root}/README.md", f'''# {pkg_name}
+    _write(
+        f"{root}/README.md",
+        f"""# {pkg_name}
 
 device-use adapter for **{device_name}**.
 
@@ -478,32 +484,37 @@ orch = create_orchestrator()
 └── tests/
     └── test_adapter.py    # Adapter tests
 ```
-''')
+""",
+    )
 
     # Skills placeholder
-    _write(f"{root}/skills/README.md", f'''# Skills for {device_name}
+    _write(
+        f"{root}/skills/README.md",
+        f"""# Skills for {device_name}
 
 Place Claude Code skills (`.md` files) here.
 
 Skills are loaded by Claude Code to provide domain-specific knowledge
 about operating {device_name}.
-''')
+""",
+    )
 
     print(f"  Created {pkg_name}/ with:")
     print(f"    src/{pkg_name}/adapter.py    {class_name}Adapter skeleton")
-    print(f"    mcp/server.py                MCP server for Claude Code")
-    print(f"    examples/quickstart.py       Quick start demo")
-    print(f"    tests/test_adapter.py        Test skeleton")
-    print(f"    pyproject.toml               Entry point registered")
-    print(f"\n  Next steps:")
+    print("    mcp/server.py                MCP server for Claude Code")
+    print("    examples/quickstart.py       Quick start demo")
+    print("    tests/test_adapter.py        Test skeleton")
+    print("    pyproject.toml               Entry point registered")
+    print("\n  Next steps:")
     print(f"    cd {pkg_name}")
-    print(f"    pip install -e .")
-    print(f"    python -m pytest tests/")
+    print("    pip install -e .")
+    print("    python -m pytest tests/")
 
 
 def _write(path: str, content: str):
     """Write a file, creating parent directories."""
     import os
+
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write(content)
@@ -512,6 +523,7 @@ def _write(path: str, content: str):
 def _hero():
     """Show a quick overview when no command is given."""
     import time
+
     from device_use import create_orchestrator
 
     print("""
@@ -551,6 +563,7 @@ def _hero():
     print(f"\n  Data: {nmr_count} NMR datasets, {plate_count} plate assays")
 
     import os
+
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
     print(f"  AI:   {'Claude API ready' if has_key else 'demo mode (cached responses)'}")
 

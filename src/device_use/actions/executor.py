@@ -11,10 +11,6 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-import pyautogui
-from pyautogui import FailSafeException as _FailSafeException
-import pyperclip
-
 from device_use.actions.models import (
     Action,
     ClickAction,
@@ -29,7 +25,7 @@ from device_use.actions.models import (
     WaitAction,
 )
 from device_use.actions.scaling import CoordinateScaler
-from device_use.core.models import ActionRequest, ActionResult, ActionType
+from device_use.core.models import ActionRequest, ActionResult
 
 if TYPE_CHECKING:
     from device_use.safety.guard import SafetyGuard
@@ -39,9 +35,24 @@ logger = logging.getLogger(__name__)
 # Anthropic computer-use pattern: wait for UI to settle after action
 UI_SETTLE_DELAY = 2.0
 
-# Disable pyautogui failsafe in production (we have our own safety)
-pyautogui.FAILSAFE = True
-pyautogui.PAUSE = 0.1
+# Lazy-loaded GUI modules (pyautogui requires DISPLAY on Linux)
+_pyautogui = None
+_pyperclip = None
+_FailSafeException = None
+
+
+def _ensure_gui_deps():
+    """Import pyautogui/pyperclip on first use (needs DISPLAY on Linux)."""
+    global _pyautogui, _pyperclip, _FailSafeException  # noqa: PLW0603
+    if _pyautogui is None:
+        import pyautogui as _pag
+        import pyperclip as _pc
+
+        _pag.FAILSAFE = True
+        _pag.PAUSE = 0.1
+        _pyautogui = _pag
+        _pyperclip = _pc
+        _FailSafeException = _pag.FailSafeException
 
 
 class ActionExecutor:
@@ -66,6 +77,8 @@ class ActionExecutor:
 
         Returns ActionResult with success/failure and timing.
         """
+        _ensure_gui_deps()
+
         # Build ActionRequest for safety check
         request = self._action_to_request(action)
 
@@ -73,9 +86,7 @@ class ActionExecutor:
         if self._safety is not None:
             verdict = self._safety.check(request)
             if not verdict.allowed:
-                logger.warning(
-                    "Action blocked by safety %s: %s", verdict.layer, verdict.reason
-                )
+                logger.warning("Action blocked by safety %s: %s", verdict.layer, verdict.reason)
                 return ActionResult(
                     success=False,
                     action=request,
@@ -96,9 +107,7 @@ class ActionExecutor:
             if not isinstance(action, WaitAction):
                 time.sleep(self._settle_delay)
 
-            return ActionResult(
-                success=True, action=request, duration_ms=duration_ms
-            )
+            return ActionResult(success=True, action=request, duration_ms=duration_ms)
 
         except _FailSafeException:
             # Physical emergency stop (mouse moved to corner) — MUST propagate
@@ -118,38 +127,36 @@ class ActionExecutor:
         """Dispatch action to appropriate pyautogui call."""
         if isinstance(action, ClickAction):
             x, y = self._scale(action.x, action.y)
-            pyautogui.click(x, y, button=action.button)
+            _pyautogui.click(x, y, button=action.button)
 
         elif isinstance(action, DoubleClickAction):
             x, y = self._scale(action.x, action.y)
-            pyautogui.doubleClick(x, y)
+            _pyautogui.doubleClick(x, y)
 
         elif isinstance(action, RightClickAction):
             x, y = self._scale(action.x, action.y)
-            pyautogui.rightClick(x, y)
+            _pyautogui.rightClick(x, y)
 
         elif isinstance(action, TypeAction):
             if action.text.isascii():
-                pyautogui.write(action.text, interval=action.interval)
+                _pyautogui.write(action.text, interval=action.interval)
             else:
                 # Clipboard paste for Unicode (CJK, µm, °C, etc.)
-                pyperclip.copy(action.text)
-                pyautogui.hotkey("ctrl", "v")
+                _pyperclip.copy(action.text)
+                _pyautogui.hotkey("ctrl", "v")
 
         elif isinstance(action, HotkeyAction):
-            pyautogui.hotkey(*action.keys)
+            _pyautogui.hotkey(*action.keys)
 
         elif isinstance(action, ScrollAction):
             x, y = self._scale(action.x, action.y)
-            pyautogui.scroll(action.clicks, x=x, y=y)
+            _pyautogui.scroll(action.clicks, x=x, y=y)
 
         elif isinstance(action, DragAction):
             sx, sy = self._scale(action.start_x, action.start_y)
             ex, ey = self._scale(action.end_x, action.end_y)
-            pyautogui.moveTo(sx, sy)
-            pyautogui.drag(
-                ex - sx, ey - sy, duration=action.duration, button="left"
-            )
+            _pyautogui.moveTo(sx, sy)
+            _pyautogui.drag(ex - sx, ey - sy, duration=action.duration, button="left")
 
         elif isinstance(action, WaitAction):
             time.sleep(action.seconds)
@@ -159,7 +166,7 @@ class ActionExecutor:
 
         elif isinstance(action, MoveAction):
             x, y = self._scale(action.x, action.y)
-            pyautogui.moveTo(x, y)
+            _pyautogui.moveTo(x, y)
 
         else:
             raise ValueError(f"Unknown action type: {type(action)}")

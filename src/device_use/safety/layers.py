@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from device_use.core.models import ActionRequest, ActionType, DeviceProfile
+from device_use.core.models import ActionRequest, DeviceProfile
 from device_use.safety.models import SafetyConfig, SafetyVerdict
 
 logger = logging.getLogger(__name__)
@@ -74,15 +74,14 @@ class ParameterBoundsChecker:
                             allowed=False,
                             layer="L2_parameter_bounds",
                             reason=(
-                                f"Parameter '{key}' value {value} "
-                                f"below minimum {bounds[min_key]}"
+                                f"Parameter '{key}' value {value} below minimum {bounds[min_key]}"
                             ),
                         )
                 except (TypeError, ValueError):
                     logger.warning(
-                        "Cannot check bounds for parameter '%s': "
-                        "value %r is not numeric",
-                        key, value,
+                        "Cannot check bounds for parameter '%s': value %r is not numeric",
+                        key,
+                        value,
                     )
 
             max_key = f"{key}_max"
@@ -93,15 +92,14 @@ class ParameterBoundsChecker:
                             allowed=False,
                             layer="L2_parameter_bounds",
                             reason=(
-                                f"Parameter '{key}' value {value} "
-                                f"exceeds maximum {bounds[max_key]}"
+                                f"Parameter '{key}' value {value} exceeds maximum {bounds[max_key]}"
                             ),
                         )
                 except (TypeError, ValueError):
                     logger.warning(
-                        "Cannot check bounds for parameter '%s': "
-                        "value %r is not numeric",
-                        key, value,
+                        "Cannot check bounds for parameter '%s': value %r is not numeric",
+                        key,
+                        value,
                     )
 
         return SafetyVerdict(allowed=True)

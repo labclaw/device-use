@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -83,20 +84,32 @@ def plot_spectrum(
     # Subtitle with metadata
     subtitle = f"{spectrum.frequency_mhz:.0f} MHz | {spectrum.nucleus} | {spectrum.solvent}"
     ax.text(
-        0.5, 1.02, subtitle,
-        transform=ax.transAxes, ha="center", fontsize=10, color="#666666",
+        0.5,
+        1.02,
+        subtitle,
+        transform=ax.transAxes,
+        ha="center",
+        fontsize=10,
+        color="#666666",
     )
 
     # Branding
     ax.text(
-        0.99, 0.97, "Device-Use | AI Scientist",
-        transform=ax.transAxes, ha="right", va="top",
-        fontsize=8, color="#999999", style="italic",
+        0.99,
+        0.97,
+        "Device-Use | AI Scientist",
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=8,
+        color="#999999",
+        style="italic",
     )
 
     plt.tight_layout()
     if return_bytes:
         import io
+
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=200, bbox_inches="tight", facecolor="white")
         plt.close(fig)

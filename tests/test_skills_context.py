@@ -1,4 +1,5 @@
 """Tests for SkillContext 4-layer system."""
+
 from __future__ import annotations
 
 import textwrap

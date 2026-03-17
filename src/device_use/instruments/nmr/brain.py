@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import time
 from collections.abc import Generator
 
@@ -17,10 +16,12 @@ logger = logging.getLogger(__name__)
 # Streaming simulation parameters (used when serving cached responses)
 # ---------------------------------------------------------------------------
 _STREAM_CHUNK_SIZE = 30  # characters per yielded chunk
-_STREAM_DELAY_S = 0.05   # seconds between chunks (50 ms)
+_STREAM_DELAY_S = 0.05  # seconds between chunks (50 ms)
 
 
-NMR_SYSTEM_PROMPT = """You are an expert NMR spectroscopist and analytical chemist working as part of an AI scientist system called Device-Use.
+NMR_SYSTEM_PROMPT = """\
+You are an expert NMR spectroscopist and analytical chemist \
+working as part of an AI scientist system called Device-Use.
 
 You receive processed NMR data (peak lists with chemical shifts and relative intensities) and must:
 1. Analyze the peak pattern (chemical shifts, relative intensities, splitting patterns if available)
@@ -91,9 +92,7 @@ class NMRBrain:
             self.client = Anthropic()
         else:
             self.client = None  # type: ignore[assignment]
-            logger.info(
-                "ANTHROPIC_API_KEY not set — NMR Brain will use cached demo responses"
-            )
+            logger.info("ANTHROPIC_API_KEY not set — NMR Brain will use cached demo responses")
         self.model = model
         self._processor = NMRProcessor()
 
@@ -122,8 +121,7 @@ class NMRBrain:
             system=system,
             messages=[{"role": "user", "content": user_message}],
         ) as stream:
-            for text in stream.text_stream:
-                yield text
+            yield from stream.text_stream
 
     def _cached_or_error(
         self,
@@ -188,10 +186,7 @@ class NMRBrain:
 
         summary = self._build_summary(spectrum)
 
-        user_message = (
-            f"Based on this NMR data, what experiment should I run next?\n\n"
-            f"{summary}"
-        )
+        user_message = f"Based on this NMR data, what experiment should I run next?\n\n{summary}"
         if hypothesis:
             user_message += f"\n\nCurrent hypothesis: {hypothesis}"
         user_message += (
