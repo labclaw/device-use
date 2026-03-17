@@ -208,7 +208,7 @@ class TestNMRBrainAPIPaths:
 
         with (
             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}),
-            patch("anthropic.Anthropic") as mock_cls,
+            patch("anthropic.Anthropic") as _mock_cls,
         ):
             brain = NMRBrain()
         assert brain._use_api is True
@@ -305,7 +305,7 @@ class TestNMRBrainAPIPaths:
                 frequency_mhz=400.0,
                 solvent="CDCl3",
             )
-            result = brain.interpret_spectrum(spectrum, stream=True)
+            brain.interpret_spectrum(spectrum, stream=True)
         assert brain._stream.called
 
     def test_suggest_with_api(self):
@@ -347,7 +347,7 @@ class TestNMRBrainAPIPaths:
                 frequency_mhz=400.0,
                 solvent="CDCl3",
             )
-            result = brain.suggest_next_experiment(spectrum, stream=True)
+            brain.suggest_next_experiment(spectrum, stream=True)
         assert brain._stream.called
 
     def test_compare_spectra_with_api(self):
@@ -430,7 +430,8 @@ class TestNMRAdapterExtended:
         mock_gui.command_mode_available = True
         mock_gui.detect_topspin_window.return_value = True
 
-        # The import is inside _connect_gui as `from device_use.instruments.nmr.gui_automation import ...`
+        # The import is inside _connect_gui as
+        # `from device_use.instruments.nmr.gui_automation import ...`
         with patch(
             "device_use.instruments.nmr.gui_automation.TopSpinGUIAutomation",
             return_value=mock_gui,
@@ -863,13 +864,13 @@ class TestExecutorLine172:
 
         mock_pag = MagicMock()
 
-        class _FakeFailSafe(Exception):
+        class _FakeFailSafeError(Exception):
             pass
 
-        mock_pag.FailSafeException = _FakeFailSafe
+        mock_pag.FailSafeException = _FakeFailSafeError
         executor_mod._pyautogui = mock_pag
         executor_mod._pyperclip = MagicMock()
-        executor_mod._FailSafeException = _FakeFailSafe
+        executor_mod._FailSafeException = _FakeFailSafeError
 
         try:
             ex = ActionExecutor(settle_delay=0)
@@ -894,13 +895,13 @@ class TestExecutorLine172:
 
         mock_pag = MagicMock()
 
-        class _FakeFailSafe(Exception):
+        class _FakeFailSafeError(Exception):
             pass
 
-        mock_pag.FailSafeException = _FakeFailSafe
+        mock_pag.FailSafeException = _FakeFailSafeError
         executor_mod._pyautogui = mock_pag
         executor_mod._pyperclip = MagicMock()
-        executor_mod._FailSafeException = _FakeFailSafe
+        executor_mod._FailSafeException = _FakeFailSafeError
 
         try:
             ex = ActionExecutor(settle_delay=0)
@@ -1043,7 +1044,7 @@ class TestToolUniverseRemaining:
         tool._tu = MagicMock()
         tool._tu.tool_specification.return_value = {"spec": "data"}
         # spec action passes empty string when no tool_name given
-        result = tool.execute(action="spec")
+        tool.execute(action="spec")
         tool._tu.tool_specification.assert_called_once_with("", format="openai")
 
 

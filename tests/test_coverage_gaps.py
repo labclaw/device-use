@@ -158,7 +158,7 @@ class TestAgentCoverage:
 
         agent = DeviceAgent(profile, backend, observer=observer)
         # No window_id in metadata -> full screen
-        result = await agent._capture_screenshot()
+        await agent._capture_screenshot()
         observer.capture_full_screen.assert_called_once()
 
     @pytest.mark.asyncio
@@ -172,7 +172,7 @@ class TestAgentCoverage:
         observer.capture_and_scale.return_value = b"PNG"
 
         agent = DeviceAgent(profile, backend, observer=observer)
-        result = await agent._capture_screenshot()
+        await agent._capture_screenshot()
         observer.capture_and_scale.assert_called_once_with(window_id="0x12345")
 
     @pytest.mark.asyncio
@@ -370,9 +370,9 @@ class TestMCPServerCoverage:
 
         with (
             patch.object(mcp_server, "_get_orchestrator", return_value=mock_orch),
-            patch("device_use.instruments.nmr.brain.NMRBrain") as MockBrain,
+            patch("device_use.instruments.nmr.brain.NMRBrain") as mock_brain_cls,
         ):
-            MockBrain.return_value.interpret_spectrum.return_value = "Analysis result"
+            mock_brain_cls.return_value.interpret_spectrum.return_value = "Analysis result"
             result = mcp_server.nmr_identify("/data/test/1", "C13H20O")
         assert result == "Analysis result"
 
@@ -528,7 +528,7 @@ class TestPlateReaderVisualizerCoverage:
         adapter.connect()
         reading = adapter.process("elisa_standard_curve")
         out_file = str(tmp_path / "heatmap.png")
-        result = plot_plate_heatmap(reading, output_path=out_file)
+        plot_plate_heatmap(reading, output_path=out_file)
         assert Path(out_file).exists()
 
 
@@ -659,7 +659,7 @@ class TestPubChemCoverage:
 
         tool = PubChemTool()
         with patch.object(tool, "get_compound_summary", return_value="summary") as mock:
-            result = tool.execute(cid=2244)
+            tool.execute(cid=2244)
         mock.assert_called_once_with(2244)
 
     def test_execute_by_formula(self):
@@ -667,7 +667,7 @@ class TestPubChemCoverage:
 
         tool = PubChemTool()
         with patch.object(tool, "lookup_by_formula", return_value={"CID": 123}) as mock:
-            result = tool.execute(formula="C9H8O4")
+            tool.execute(formula="C9H8O4")
         mock.assert_called_once_with("C9H8O4")
 
     def test_execute_no_args(self):

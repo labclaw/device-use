@@ -34,16 +34,16 @@ def _ensure_mock_gui():
     mock_pag = MagicMock()
     mock_clip = MagicMock()
 
-    class _FakeFailSafe(Exception):
+    class _FakeFailSafeError(Exception):
         pass
 
-    mock_pag.FailSafeException = _FakeFailSafe
+    mock_pag.FailSafeException = _FakeFailSafeError
 
     executor_mod._pyautogui = mock_pag
     executor_mod._pyperclip = mock_clip
-    executor_mod._FailSafeException = _FakeFailSafe
+    executor_mod._FailSafeException = _FakeFailSafeError
 
-    yield mock_pag, mock_clip, _FakeFailSafe
+    yield mock_pag, mock_clip, _FakeFailSafeError
 
     executor_mod._pyautogui = orig_pag
     executor_mod._pyperclip = orig_clip
@@ -192,11 +192,11 @@ class TestActionExecutorScaling:
 
 class TestActionExecutorFailSafe:
     def test_failsafe_propagates(self, _ensure_mock_gui):
-        mock_pag, _, FakeFailSafe = _ensure_mock_gui
-        mock_pag.click.side_effect = FakeFailSafe("Emergency stop")
+        mock_pag, _, fake_failsafe = _ensure_mock_gui
+        mock_pag.click.side_effect = fake_failsafe("Emergency stop")
         ex = ActionExecutor(settle_delay=0)
         action = ClickAction(x=0, y=0, description="corner")
-        with pytest.raises(FakeFailSafe):
+        with pytest.raises(fake_failsafe):
             ex.execute(action)
 
 

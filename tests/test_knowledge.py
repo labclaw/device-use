@@ -31,7 +31,10 @@ from device_use.knowledge.retriever import (
 
 class TestRedirectParser:
     def test_extracts_redirect_url(self):
-        html = '<meta http-equiv="refresh" content="0;url=/prog/docu/English/topspin/html/en-US/abc.html">'
+        html = (
+            '<meta http-equiv="refresh"'
+            ' content="0;url=/prog/docu/English/topspin/html/en-US/abc.html">'
+        )
         parser = _RedirectParser()
         parser.feed(html)
         assert parser.redirect_url == "/prog/docu/English/topspin/html/en-US/abc.html"
@@ -159,7 +162,8 @@ class TestConvertTopspinCommand:
     def test_returns_none_for_missing_content(self, tmp_path):
         stub = tmp_path / "efp.html"
         stub.write_text(
-            '<meta http-equiv="refresh" content="0;url=/prog/docu/English/topspin/html/en-US/abc.html">'
+            '<meta http-equiv="refresh"'
+            ' content="0;url=/prog/docu/English/topspin/html/en-US/abc.html">'
         )
         result = convert_topspin_command(stub)
         assert result is None
@@ -183,7 +187,8 @@ class TestConvertTopspinCommand:
         # Create redirect stub
         stub = tmp_path / "efp.html"
         stub.write_text(
-            '<meta http-equiv="refresh" content="0;url=/prog/docu/English/topspin/html/en-US/content.html">'
+            '<meta http-equiv="refresh"'
+            ' content="0;url=/prog/docu/English/topspin/html/en-US/content.html">'
         )
         result = convert_topspin_command(stub)
         assert result is not None
