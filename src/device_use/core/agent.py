@@ -11,8 +11,6 @@ import logging
 import time
 from typing import Any
 
-from pyautogui import FailSafeException as _FailSafeException
-
 from device_use.actions.executor import ActionExecutor
 from device_use.actions.models import parse_action
 from device_use.actions.scaling import CoordinateScaler
@@ -226,11 +224,12 @@ class DeviceAgent:
                 duration_ms=(time.monotonic() - start_time) * 1000,
             )
 
-        except _FailSafeException:
-            # Physical emergency stop — MUST propagate to caller
-            raise
-
         except Exception as e:
+            # Physical emergency stop — MUST propagate to caller
+            from device_use.actions.executor import _FailSafeException
+
+            if _FailSafeException is not None and isinstance(e, _FailSafeException):
+                raise
             logger.exception("Agent execution error")
             return AgentResult(
                 success=False,
