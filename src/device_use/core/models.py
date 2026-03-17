@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class SafetyLevel(str, Enum):
+class SafetyLevel(StrEnum):
     """Safety enforcement level. Hardware devices default to strict."""
 
     STRICT = "strict"
@@ -16,7 +16,7 @@ class SafetyLevel(str, Enum):
     PERMISSIVE = "permissive"
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     """Supported GUI action types."""
 
     CLICK = "click"

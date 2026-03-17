@@ -20,7 +20,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from device_use.instruments.base import BaseInstrument, InstrumentInfo
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Event types emitted during pipeline execution."""
 
     PIPELINE_START = "pipeline_start"
@@ -181,7 +181,7 @@ class ToolRegistry:
 # ---------------------------------------------------------------------------
 
 
-class StepStatus(str, Enum):
+class StepStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
