@@ -69,3 +69,4 @@ jobs:
           -v --tb=short
           --cov=device_use
           --cov-report=term-missing
+          --cov-fail-under=95
