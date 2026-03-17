@@ -79,10 +79,21 @@ markers = [
 
 [tool.coverage.run]
 source = ["device_use"]
-omit = ["*/tests/*", "*/demos/*"]
+omit = [
+    "*/tests/*",
+    "*/demos/*",
+    "*/operators/a11y.py",  # macOS-only (CoreFoundation/ApplicationServices)
+]
 
 [tool.coverage.report]
 show_missing = true
+fail_under = 95
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
 
 [tool.mypy]
 python_version = "3.11"
