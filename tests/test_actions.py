@@ -193,7 +193,7 @@ class TestActionModels:
 
 
 class TestActionExecutor:
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_click_execution(self, mock_pyautogui):
         executor = ActionExecutor(settle_delay=0)
         action = ClickAction(x=100, y=200)
@@ -201,7 +201,7 @@ class TestActionExecutor:
         assert result.success is True
         mock_pyautogui.click.assert_called_once_with(100, 200, button="left")
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_type_execution_ascii(self, mock_pyautogui):
         executor = ActionExecutor(settle_delay=0)
         action = TypeAction(text="hello")
@@ -209,8 +209,8 @@ class TestActionExecutor:
         assert result.success is True
         mock_pyautogui.write.assert_called_once_with("hello", interval=0.02)
 
-    @patch("device_use.actions.executor.pyperclip")
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyperclip")
+    @patch("device_use.actions.executor._pyautogui")
     def test_type_execution_unicode(self, mock_pyautogui, mock_pyperclip):
         executor = ActionExecutor(settle_delay=0)
         action = TypeAction(text="温度 25°C")
@@ -219,7 +219,7 @@ class TestActionExecutor:
         mock_pyperclip.copy.assert_called_once_with("温度 25°C")
         mock_pyautogui.hotkey.assert_called_once_with("ctrl", "v")
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_hotkey_execution(self, mock_pyautogui):
         executor = ActionExecutor(settle_delay=0)
         action = HotkeyAction(keys=["ctrl", "c"])
@@ -227,7 +227,7 @@ class TestActionExecutor:
         assert result.success is True
         mock_pyautogui.hotkey.assert_called_once_with("ctrl", "c")
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_scroll_execution(self, mock_pyautogui):
         executor = ActionExecutor(settle_delay=0)
         action = ScrollAction(x=100, y=200, clicks=-3)
@@ -235,14 +235,14 @@ class TestActionExecutor:
         assert result.success is True
         mock_pyautogui.scroll.assert_called_once_with(-3, x=100, y=200)
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_wait_execution(self, mock_pyautogui):
         executor = ActionExecutor(settle_delay=0)
         action = WaitAction(seconds=0.01)
         result = executor.execute(action)
         assert result.success is True
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_execution_with_scaler(self, mock_pyautogui):
         scaler = CoordinateScaler(
             vlm_width=1280,
@@ -260,7 +260,7 @@ class TestActionExecutor:
         # 100 * (1200/800) + 30 = 180
         mock_pyautogui.click.assert_called_once_with(200, 180, button="left")
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_execution_failure(self, mock_pyautogui):
         mock_pyautogui.click.side_effect = RuntimeError("Display not found")
         executor = ActionExecutor(settle_delay=0)
@@ -269,7 +269,7 @@ class TestActionExecutor:
         assert result.success is False
         assert "Display not found" in result.error
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_safety_blocks_action(self, mock_pyautogui):
         from device_use.safety.models import SafetyVerdict
 
@@ -284,7 +284,7 @@ class TestActionExecutor:
         assert "L1_whitelist" in result.error
         mock_pyautogui.click.assert_not_called()
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_safety_allows_action(self, mock_pyautogui):
         from device_use.safety.models import SafetyVerdict
 
@@ -296,25 +296,31 @@ class TestActionExecutor:
         assert result.success is True
         mock_guard.record_action.assert_called_once()
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_duration_tracking(self, mock_pyautogui):
         executor = ActionExecutor(settle_delay=0)
         action = ClickAction(x=100, y=200)
         result = executor.execute(action)
         assert result.duration_ms >= 0
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_failsafe_exception_propagates(self, mock_pyautogui):
         """pyautogui.FailSafeException must propagate (physical e-stop)."""
-        from pyautogui import FailSafeException
+        import device_use.actions.executor as _executor_mod
 
-        mock_pyautogui.click.side_effect = FailSafeException("corner")
+        # Create a custom exception to stand in for FailSafeException
+        class _MockFailSafeError(Exception):
+            pass
+
+        mock_pyautogui.click.side_effect = _MockFailSafeError("corner")
+        # Patch the module-level sentinel so the except clause recognises it
+        _executor_mod._FailSafeException = _MockFailSafeError
         executor = ActionExecutor(settle_delay=0)
         action = ClickAction(x=100, y=200)
-        with pytest.raises(FailSafeException):
+        with pytest.raises(_MockFailSafeError):
             executor.execute(action)
 
-    @patch("device_use.actions.executor.pyautogui")
+    @patch("device_use.actions.executor._pyautogui")
     def test_scaled_coords_in_safety_request(self, mock_pyautogui):
         """Safety check receives screen-space coordinates, not VLM-space."""
         from device_use.safety.models import SafetyVerdict
