@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "device-use"
-version = "0.1.0"
+version = "0.1.1"
 description = "Like browser-use, but for scientific instruments — GUI agent framework for lab software"
 readme = "README.md"
 license = "Apache-2.0"
