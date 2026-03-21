@@ -993,4 +993,4 @@ if __name__ == "__main__":
 
     print("\n  Device-Use Web GUI starting...")
     print("  Open http://localhost:8420 in your browser\n")
-    uvicorn.run(app, host="0.0.0.0", port=8420, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=8420, log_level="info")
