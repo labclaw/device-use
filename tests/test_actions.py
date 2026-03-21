@@ -260,6 +260,7 @@ class TestActionExecutor:
         # 100 * (1200/800) + 30 = 180
         mock_pyautogui.click.assert_called_once_with(200, 180, button="left")
 
+    @patch("device_use.actions.executor._FailSafeException", type("MockFailSafe", (Exception,), {}))
     @patch("device_use.actions.executor._pyautogui")
     def test_execution_failure(self, mock_pyautogui):
         mock_pyautogui.click.side_effect = RuntimeError("Display not found")

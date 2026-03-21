@@ -34,6 +34,7 @@ class TestPubChemTool:
         assert result["MolecularFormula"] == "C9H8O4"
 
     @pytest.mark.network
+    @pytest.mark.timeout(30)
     def test_lookup_by_formula(self):
         tool = PubChemTool()
         result = tool.lookup_by_formula("C9H8O4")
