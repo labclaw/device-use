@@ -100,6 +100,12 @@ python_version = "3.11"
 warn_return_any = true
 check_untyped_defs = true
 
+[tool.bandit]
+# device-use is a device-control application that uses subprocess
+# to interact with instrument CLI tools (adb, scrcpy, etc.).
+# B404/B603/B607 are expected and valid for this codebase.
+skips = ["B404", "B603", "B607", "B110", "B311", "B108", "B104", "B310"]
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "v$version"
