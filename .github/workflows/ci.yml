@@ -27,7 +27,7 @@ jobs:
         uses: astral-sh/setup-uv@a2a8b00df0aa22a77a33ee5f956c2128661fabeb # v7
 
       - name: Install dependencies
-        run: uv sync --extra dev --frozen
+        run: uv sync --extra dev
 
       - name: Ruff check
         run: uv run ruff check src/ tests/
@@ -54,7 +54,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra nmr --extra web --extra mcp --frozen
+        run: uv sync --extra dev --extra nmr --extra web --extra mcp
 
       - name: Run tests with coverage
         env:
