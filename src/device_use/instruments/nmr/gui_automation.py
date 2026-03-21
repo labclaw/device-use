@@ -252,13 +252,14 @@ class TopSpinGUIAutomation:
 
         if platform.system() == "Darwin":
             # Use AppleScript to type into TopSpin
+            safe_command = command.replace('"', '\\"')
             script = f'''
             tell application "TopSpin 5"
                 activate
             end tell
             delay 0.5
             tell application "System Events"
-                keystroke "{command}"
+                keystroke "{safe_command}"
                 keystroke return
             end tell
             '''
