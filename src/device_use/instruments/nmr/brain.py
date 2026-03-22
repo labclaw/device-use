@@ -111,7 +111,7 @@ class NMRBrain:
             system=system,
             messages=[{"role": "user", "content": user_message}],
         )
-        return response.content[0].text
+        return next((b.text for b in response.content if hasattr(b, "text")), "")
 
     def _stream(self, system: str, user_message: str, max_tokens: int = 2000) -> Generator[str]:
         """Streaming API call — yields text chunks."""

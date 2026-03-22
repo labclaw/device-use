@@ -45,7 +45,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8420", "http://127.0.0.1:8420"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -661,10 +661,14 @@ async function init() {
     datasets.forEach(ds => {
       const card = document.createElement('div');
       card.className = 'dataset-card';
-      card.innerHTML = `
-        <div class="name">${ds.sample}/${ds.expno}</div>
-        <div class="title">${ds.title || 'No title'}</div>
-      `;
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'name';
+      nameDiv.textContent = `${ds.sample}/${ds.expno}`;
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'title';
+      titleDiv.textContent = ds.title || 'No title';
+      card.appendChild(nameDiv);
+      card.appendChild(titleDiv);
       card.onclick = () => selectDataset(ds.sample, ds.expno, ds.title);
       container.appendChild(card);
     });
@@ -680,10 +684,14 @@ async function init() {
     datasets.forEach(ds => {
       const card = document.createElement('div');
       card.className = 'dataset-card';
-      card.innerHTML = `
-        <div class="name">${ds.name}</div>
-        <div class="title">${ds.protocol} · ${ds.mode} · ${ds.wavelength_nm}nm</div>
-      `;
+      const pNameDiv = document.createElement('div');
+      pNameDiv.className = 'name';
+      pNameDiv.textContent = ds.name;
+      const pTitleDiv = document.createElement('div');
+      pTitleDiv.className = 'title';
+      pTitleDiv.textContent = `${ds.protocol} · ${ds.mode} · ${ds.wavelength_nm}nm`;
+      card.appendChild(pNameDiv);
+      card.appendChild(pTitleDiv);
       card.onclick = () => selectPlate(ds.name);
       container.appendChild(card);
     });
@@ -776,7 +784,7 @@ async function runAnalysis() {
       } else if (data.type === 'error') {
         es.close();
         document.getElementById('btnAnalyze').disabled = false;
-        panel.innerHTML = `<span style="color:red;">Error: ${data.message}</span>`;
+        panel.textContent = `Error: ${data.message}`;
       }
     };
 
@@ -785,7 +793,7 @@ async function runAnalysis() {
       document.getElementById('btnAnalyze').disabled = false;
     };
   } catch (e) {
-    panel.innerHTML = `<span style="color:red;">Error: ${e.message}</span>`;
+    panel.textContent = `Error: ${e.message}`;
     document.getElementById('btnAnalyze').disabled = false;
   }
 }
@@ -832,11 +840,33 @@ async function runPubchem() {
 | **Weight** | ${data.MolecularWeight || 'N/A'} |
 | **SMILES** | ${data.CanonicalSMILES || data.SMILES || 'N/A'} |
 | **InChIKey** | ${data.InChIKey || 'N/A'} |`;
-    panel.innerHTML = typeof marked !== 'undefined' ? marked.parse(md) : md;
+    panel.textContent = '';
+    const table = document.createElement('table');
+    table.innerHTML = '<tr><th>Property</th><th>Value</th></tr>';
+    const rows = [
+      ['CID', data.CID],
+      ['IUPAC', data.IUPACName || 'N/A'],
+      ['Formula', data.MolecularFormula || 'N/A'],
+      ['Weight', data.MolecularWeight || 'N/A'],
+      ['SMILES', data.CanonicalSMILES || data.SMILES || 'N/A'],
+      ['InChIKey', data.InChIKey || 'N/A'],
+    ];
+    rows.forEach(([label, value]) => {
+      const tr = document.createElement('tr');
+      const tdLabel = document.createElement('td');
+      tdLabel.textContent = label;
+      const tdValue = document.createElement('td');
+      tdValue.textContent = value;
+      tr.appendChild(tdLabel);
+      tr.appendChild(tdValue);
+      table.appendChild(tr);
+    });
+    panel.textContent = '';
+    panel.appendChild(table);
   } catch (e) {
     const panel = document.getElementById('aiPanel');
     panel.style.display = 'block';
-    panel.innerHTML = `<span style="color:var(--dim);">PubChem: ${e.message}</span>`;
+    panel.textContent = `PubChem: ${e.message}`;
   }
   document.getElementById('btnPubchem').disabled = false;
 }
@@ -902,7 +932,7 @@ async function selectPlate(name) {
 
     document.getElementById('plateHeatmap').innerHTML = html;
   } catch (e) {
-    document.getElementById('plateMeta').innerHTML = `<span style="color:red;">Failed: ${e.message}</span>`;
+    document.getElementById('plateMeta').textContent = `Failed: ${e.message}`;
   }
 }
 
@@ -937,7 +967,7 @@ async function runPlateAnalysis() {
       } else if (data.type === 'error') {
         es.close();
         document.getElementById('btnPlateAnalyze').disabled = false;
-        panel.innerHTML = `<span style="color:red;">Error: ${data.message}</span>`;
+        panel.textContent = `Error: ${data.message}`;
       }
     };
 
@@ -946,7 +976,7 @@ async function runPlateAnalysis() {
       document.getElementById('btnPlateAnalyze').disabled = false;
     };
   } catch (e) {
-    panel.innerHTML = `<span style="color:red;">Error: ${e.message}</span>`;
+    panel.textContent = `Error: ${e.message}`;
     document.getElementById('btnPlateAnalyze').disabled = false;
   }
 }
@@ -963,4 +993,4 @@ if __name__ == "__main__":
 
     print("\n  Device-Use Web GUI starting...")
     print("  Open http://localhost:8420 in your browser\n")
-    uvicorn.run(app, host="0.0.0.0", port=8420, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=8420, log_level="info")

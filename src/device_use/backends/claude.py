@@ -54,7 +54,7 @@ class ClaudeBackend:
             kwargs["system"] = system
 
         response = await self._client.messages.create(**kwargs)
-        return response.content[0].text
+        return next((b.text for b in response.content if hasattr(b, "text")), "")
 
     @staticmethod
     def _encode_image(screenshot: bytes) -> str:
