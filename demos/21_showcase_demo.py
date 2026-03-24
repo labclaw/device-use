@@ -13,11 +13,10 @@ Architecture (maximum reliability):
 Zero dependencies on pyautogui or mouse position. Never crashes.
 
 Usage:
-    source ~/.zshrc
-    cd /Users/robert/workspace/36-labclaw/wt-device-use-e2e
-    PYTHONPATH=src /Users/robert/workspace/36-labclaw/device-use/.venv/bin/python \
-        demos/21_showcase_demo.py
+    cd /path/to/device-use
+    PYTHONPATH=src python demos/21_showcase_demo.py
 """
+
 from __future__ import annotations
 
 import base64
@@ -62,13 +61,15 @@ DOT = f"{DIM}\u00b7{RESET}"
 # Reliable Primitives — each one is bulletproof
 # ══════════════════════════════════════════════════════════════
 
+
 def focus_topspin() -> bool:
     """Bring TopSpin to front. Works even if minimized."""
     try:
         result = subprocess.run(
-            ["osascript", "-e",
-             'tell application id "net.java.openjdk.java" to activate'],
-            timeout=5, capture_output=True, text=True,
+            ["osascript", "-e", 'tell application id "net.java.openjdk.java" to activate'],
+            timeout=5,
+            capture_output=True,
+            text=True,
         )
         time.sleep(0.5)
         return result.returncode == 0
@@ -86,19 +87,21 @@ def send_topspin_command(cmd: str) -> bool:
     safe_cmd = cmd.replace("\\", "\\\\").replace('"', '\\"')
     script = (
         'tell application id "net.java.openjdk.java" to activate\n'
-        'delay 0.5\n'
+        "delay 0.5\n"
         'tell application "System Events"\n'
         '  keystroke "a" using command down\n'
-        '  delay 0.1\n'
+        "  delay 0.1\n"
         f'  keystroke "{safe_cmd}"\n'
-        '  delay 0.1\n'
-        '  keystroke return\n'
-        'end tell'
+        "  delay 0.1\n"
+        "  keystroke return\n"
+        "end tell"
     )
     try:
         result = subprocess.run(
             ["osascript", "-e", script],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         return result.returncode == 0
     except Exception:
@@ -114,7 +117,8 @@ def take_screenshot(name: str) -> Path | None:
         time.sleep(0.3)
         subprocess.run(
             ["screencapture", "-x", str(path)],
-            check=True, timeout=10,
+            check=True,
+            timeout=10,
         )
         return path if path.exists() and path.stat().st_size > 0 else None
     except Exception:
@@ -124,6 +128,7 @@ def take_screenshot(name: str) -> Path | None:
 def take_screenshot_bytes(op: AccessibilityOperator | None = None) -> bytes | None:
     """Take a screenshot and return raw PNG bytes, or None on failure."""
     import tempfile
+
     tmp = tempfile.mktemp(suffix=".png")
     try:
         focus_topspin()
@@ -136,9 +141,12 @@ def take_screenshot_bytes(op: AccessibilityOperator | None = None) -> bytes | No
                 win = op.get_focused_window()
                 if win:
                     import ctypes
+
                     op._ax.AXValueGetValue.restype = ctypes.c_bool
                     op._ax.AXValueGetValue.argtypes = [
-                        ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p,
+                        ctypes.c_void_p,
+                        ctypes.c_int,
+                        ctypes.c_void_p,
                     ]
                     err, pos_ref = op._get_attr(win, "AXPosition")
                     err2, size_ref = op._get_attr(win, "AXSize")
@@ -153,7 +161,8 @@ def take_screenshot_bytes(op: AccessibilityOperator | None = None) -> bytes | No
                         if w > 0 and h > 0:
                             subprocess.run(
                                 ["screencapture", "-x", "-R", f"{x},{y},{w},{h}", tmp],
-                                check=True, timeout=10,
+                                check=True,
+                                timeout=10,
                             )
                             captured = True
             except Exception:
@@ -185,11 +194,15 @@ def ensure_main_window(op: AccessibilityOperator) -> bool:
                 return True
             # Cycle past this window
             subprocess.run(
-                ["osascript", "-e",
-                 'tell application "System Events"\n'
-                 '  keystroke "`" using command down\n'
-                 'end tell'],
-                timeout=5, capture_output=True,
+                [
+                    "osascript",
+                    "-e",
+                    'tell application "System Events"\n'
+                    '  keystroke "`" using command down\n'
+                    "end tell",
+                ],
+                timeout=5,
+                capture_output=True,
             )
             time.sleep(0.4)
         except Exception:
@@ -262,6 +275,7 @@ def count_ui_elements(op: AccessibilityOperator) -> int:
 # AI Verification (graceful degradation)
 # ══════════════════════════════════════════════════════════════
 
+
 def ai_verify_spectrum(screenshot_bytes: bytes) -> dict[str, Any]:
     """Send screenshot to Claude Sonnet 4 via OpenRouter for quality assessment.
 
@@ -291,33 +305,35 @@ def ai_verify_spectrum(screenshot_bytes: bytes) -> dict[str, Any]:
         response = client.chat.completions.create(
             model="anthropic/claude-sonnet-4",
             max_tokens=400,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{b64}"},
-                    },
-                    {
-                        "type": "text",
-                        "text": (
-                            "You are evaluating an NMR spectrum in Bruker TopSpin software.\n"
-                            "Check these criteria and reply EXACTLY in this format:\n\n"
-                            "QUALITY: <1-10>\n"
-                            "FINDING: <criterion> = YES or NO\n"
-                            "FINDING: <criterion> = YES or NO\n"
-                            "...\n"
-                            "ASSESSMENT: <one sentence summary>\n\n"
-                            "Criteria to check:\n"
-                            "1. Clean 1H NMR spectrum visible\n"
-                            "2. Peaks properly phased (all upright)\n"
-                            "3. Baseline flat, no artifacts\n"
-                            "4. Peak labels visible at major resonances\n"
-                            "5. Chemical shift range 0-14 ppm correct"
-                        ),
-                    },
-                ],
-            }],
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{b64}"},
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                "You are evaluating an NMR spectrum in Bruker TopSpin software.\n"
+                                "Check these criteria and reply EXACTLY in this format:\n\n"
+                                "QUALITY: <1-10>\n"
+                                "FINDING: <criterion> = YES or NO\n"
+                                "FINDING: <criterion> = YES or NO\n"
+                                "...\n"
+                                "ASSESSMENT: <one sentence summary>\n\n"
+                                "Criteria to check:\n"
+                                "1. Clean 1H NMR spectrum visible\n"
+                                "2. Peaks properly phased (all upright)\n"
+                                "3. Baseline flat, no artifacts\n"
+                                "4. Peak labels visible at major resonances\n"
+                                "5. Chemical shift range 0-14 ppm correct"
+                            ),
+                        },
+                    ],
+                }
+            ],
         )
 
         text = response.choices[0].message.content or ""
@@ -376,6 +392,7 @@ def ai_verify_spectrum(screenshot_bytes: bytes) -> dict[str, Any]:
 # Safe Step Runner — wraps every step so nothing ever crashes
 # ══════════════════════════════════════════════════════════════
 
+
 class StepResult:
     """Result of a single demo step."""
 
@@ -398,6 +415,7 @@ class StepResult:
 # Display Helpers
 # ══════════════════════════════════════════════════════════════
 
+
 def print_header() -> None:
     """Print the showcase banner."""
     print(f"""
@@ -414,7 +432,11 @@ def print_detail(key: str, value: str) -> None:
 
 
 def print_substep_indexed(
-    idx: int, label: str, passed: bool, elapsed: float, desc: str = "",
+    idx: int,
+    label: str,
+    passed: bool,
+    elapsed: float,
+    desc: str = "",
 ) -> None:
     """Print a lettered sub-step result line."""
     letter = chr(ord("a") + idx)
@@ -438,6 +460,7 @@ def print_ai_box(
     def row(text: str) -> str:
         # Strip ANSI for length calculation
         import re
+
         clean = re.sub(r"\033\[[0-9;]*m", "", text)
         pad = box_w - len(clean)
         return f"  {CYAN}\u2502{RESET} {text}{' ' * max(0, pad)}{CYAN}\u2502{RESET}"
@@ -482,9 +505,13 @@ def print_footer(
     print(f"\n{sep}")
 
     if all_passed:
-        print(f"  {GREEN}{BOLD}EXPERIMENT COMPLETE \u2014 {passed_count}/{total_count} steps passed{RESET}")
+        print(
+            f"  {GREEN}{BOLD}EXPERIMENT COMPLETE \u2014 {passed_count}/{total_count} steps passed{RESET}"
+        )
     else:
-        print(f"  {YELLOW}{BOLD}EXPERIMENT FINISHED \u2014 {passed_count}/{total_count} steps passed{RESET}")
+        print(
+            f"  {YELLOW}{BOLD}EXPERIMENT FINISHED \u2014 {passed_count}/{total_count} steps passed{RESET}"
+        )
 
     print(f"""
   {BOLD}What just happened:{RESET}
@@ -504,6 +531,7 @@ def print_footer(
 # ══════════════════════════════════════════════════════════════
 # Step Implementations
 # ══════════════════════════════════════════════════════════════
+
 
 def step1_connect(op: AccessibilityOperator) -> StepResult:
     """Step 1: Connect to instrument via AX API and read state."""
@@ -536,7 +564,9 @@ def step1_connect(op: AccessibilityOperator) -> StepResult:
         print_detail("Window", win_title)
         print_detail("Elements", f"{elem_count} UI elements detected")
         if menu_names:
-            print_detail("Menus", ", ".join(menu_names[:8]) + ("..." if len(menu_names) > 8 else ""))
+            print_detail(
+                "Menus", ", ".join(menu_names[:8]) + ("..." if len(menu_names) > 8 else "")
+            )
 
         return StepResult(
             passed=True,
@@ -586,7 +616,7 @@ def step2_load_dataset(op: AccessibilityOperator) -> StepResult:
         status_str = " | ".join(texts[:2]) if texts else "(command sent)"
         has_name = any(DATASET_NAME.lower() in t.lower() for t in texts)
         if has_name:
-            print_detail("Verification", f"AX status shows \"{DATASET_NAME}\" {CHECK}")
+            print_detail("Verification", f'AX status shows "{DATASET_NAME}" {CHECK}')
         else:
             print_detail("Verification", f"Command sent successfully {CHECK}")
 
@@ -610,7 +640,9 @@ def step3_process(op: AccessibilityOperator) -> StepResult:
         send_topspin_command("efp")
         wait_for_command_done(op, "efp", timeout_s=15.0)
         dt_sub = time.monotonic() - t_sub
-        sub_results.append(("Fourier Transform (efp)", True, dt_sub, "FID to frequency domain conversion"))
+        sub_results.append(
+            ("Fourier Transform (efp)", True, dt_sub, "FID to frequency domain conversion")
+        )
         take_screenshot("step_3a_efp")
     except Exception as e:
         dt_sub = time.monotonic() - t_sub
@@ -624,7 +656,9 @@ def step3_process(op: AccessibilityOperator) -> StepResult:
         send_topspin_command("apk")
         wait_for_command_done(op, "apk", timeout_s=15.0)
         dt_sub = time.monotonic() - t_sub
-        sub_results.append(("Phase Correction (apk)", True, dt_sub, "Automatic zero/first order correction"))
+        sub_results.append(
+            ("Phase Correction (apk)", True, dt_sub, "Automatic zero/first order correction")
+        )
         take_screenshot("step_3b_apk")
     except Exception as e:
         dt_sub = time.monotonic() - t_sub
@@ -643,15 +677,17 @@ def step3_process(op: AccessibilityOperator) -> StepResult:
             try:
                 script = (
                     'tell application "System Events"\n'
-                    '  repeat 15 times\n'
-                    '    keystroke return\n'
-                    '    delay 0.2\n'
-                    '  end repeat\n'
-                    'end tell'
+                    "  repeat 15 times\n"
+                    "    keystroke return\n"
+                    "    delay 0.2\n"
+                    "  end repeat\n"
+                    "end tell"
                 )
                 subprocess.run(
                     ["osascript", "-e", script],
-                    timeout=20, capture_output=True, text=True,
+                    timeout=20,
+                    capture_output=True,
+                    text=True,
                 )
                 time.sleep(1.0)
 
@@ -669,7 +705,9 @@ def step3_process(op: AccessibilityOperator) -> StepResult:
         ensure_main_window(op)
         wait_for_command_done(op, "pp", timeout_s=10.0)
         dt_sub = time.monotonic() - t_sub
-        sub_results.append(("Peak Picking (pp)", True, dt_sub, "Automatic peak detection & labeling"))
+        sub_results.append(
+            ("Peak Picking (pp)", True, dt_sub, "Automatic peak detection & labeling")
+        )
         take_screenshot("step_3c_pp")
     except Exception as e:
         dt_sub = time.monotonic() - t_sub
@@ -781,6 +819,7 @@ def step5_summary(
 # Main
 # ══════════════════════════════════════════════════════════════
 
+
 def main() -> int:
     """Run the showcase demo. Returns 0 on success, 1 on failure."""
 
@@ -790,7 +829,9 @@ def main() -> int:
     try:
         result = subprocess.run(
             ["pgrep", "-f", "topspin.jar"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
     except Exception:
         print(f"  {CROSS} Could not check for TopSpin process.")
