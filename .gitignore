@@ -41,3 +41,9 @@ history_j.txt
 log/
 null/
 spectrum.png
+
+# Environment
+.env
+
+# Type checking
+.mypy_cache/
