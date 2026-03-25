@@ -192,7 +192,7 @@ Spectral library fingerprint matching — build a reference library from examdat
 python demos/15_showcase.py
 ```
 
-All features in one script — the pitch demo for presentations.
+All features in one script — the full showcase for presentations.
 
 ## Demo 16: Benchmark (`16_benchmark.py`)
 

@@ -430,7 +430,7 @@ Step 5: Multi-model + Polish (Day 16-20)
 ├── Best-of-N 策略 (跑 3 次选最好)
 ├── Demo 视频录制
 ├── 开源 repo 准备
-└── 产出: Nature paper 数据 + investor demo
+└── 产出: Nature paper 数据 + demo
 ```
 
 **核心依赖:**
@@ -469,7 +469,7 @@ pip install opentrons  # Opentrons simulation
    - Agent 调整参数 → 重新运行
    - → 完整的科学闭环!
 4. 切换到真实 StepOne Software 只需要换一层 adapter
-5. demo 给投资人: "这是我们的仪器操作 agent"
+5. demo 展示: "这是我们的仪器操作 agent"
    (他们看不出是 Shell App 还是真 Software — 流程一样)
 
 Shell App 的 Ct 值模拟:

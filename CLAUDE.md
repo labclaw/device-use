@@ -69,7 +69,7 @@ demos/
   12_streaming.py               # Real-time event stream
   13_compare.py                 # Side-by-side spectral comparison
   14_library.py                 # Spectral library fingerprint matching
-  15_showcase.py                # All features in one script (pitch demo)
+  15_showcase.py                # All features in one script (showcase)
   16_benchmark.py               # Performance benchmark
 
 tests/
