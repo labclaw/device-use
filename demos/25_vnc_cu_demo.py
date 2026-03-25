@@ -5,7 +5,7 @@ Uses vncdotool for VNC screenshots and input from the host side.
 Sonnet 4.6 (via OpenRouter) verifies each step via screenshot analysis.
 Each frame is pushed to labwork-web as MJPEG stream for live viewing.
 
-Tart VM: topspin-sequoia (ARD auth: admin/admin, VNC port 5900).
+Tart VM: topspin-sequoia (ARD auth via env vars VNC_USER/VNC_PASS, VNC port 5900).
 Framebuffer: 2048x1536 (retina for 1024x768 VM display).
 Sonnet perceives images at ~1280x960 and applies 1.6x scaling.
 
@@ -15,6 +15,7 @@ Usage:
     # 3. Run demo:   python demos/25_vnc_cu_demo.py
     # 4. Watch:      open http://localhost:8430 → Live VM tab
 """
+
 from __future__ import annotations
 
 import base64
@@ -40,9 +41,9 @@ DATASET = os.environ.get(
     "/opt/topspin5.0.0/examdata/exam_CMCse_1/1",
 )
 
-VM_NAME = "topspin-sequoia"
-VM_USER = "admin"
-VM_PASS = "admin"
+VM_NAME = os.environ.get("VM_NAME", "topspin-sequoia")
+VM_USER = os.environ.get("VNC_USER", "changeme")
+VM_PASS = os.environ.get("VNC_PASS", "changeme")
 VNC_PORT = 5900
 
 # TopSpin command line position (framebuffer coords, 2048x1536)
@@ -59,11 +60,14 @@ RST = "\033[0m"
 
 # ── VNC helpers ──────────────────────────────────
 
+
 def get_vnc_info() -> tuple[str, str]:
     """Get VNC address from tart ip."""
     result = subprocess.run(
         ["tart", "ip", VM_NAME],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     ip = result.stdout.strip()
     if not ip:
@@ -160,6 +164,7 @@ def vnc_type_command(vnc_addr: str, cmd: str):
 
 # ── Stream helpers ───────────────────────────────
 
+
 def push_frame(jpeg_bytes: bytes):
     """Push a JPEG frame to labwork-web MJPEG stream."""
     try:
@@ -202,36 +207,41 @@ def screenshot_and_push(vnc_addr: str) -> tuple[Image.Image, bytes]:
 
 # ── VLM ─────────────────────────────────────────
 
+
 def ask_sonnet(client: OpenAI, screenshot_b64: str, question: str) -> str:
     """Send screenshot + question to Sonnet 4.6, get text response."""
     response = client.chat.completions.create(
         model=MODEL,
         max_tokens=512,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{screenshot_b64}"},
-                },
-                {
-                    "type": "text",
-                    "text": (
-                        "This is a 2048x1536 pixel screenshot of macOS with Bruker TopSpin 5.0.\n"
-                        f"{question}\n\n"
-                        "Remember: scale perceived coordinates by 1.6 for 2048x1536 space.\n"
-                        "Return ONLY JSON, no markdown fences."
-                    ),
-                },
-            ],
-        }],
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{screenshot_b64}"},
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "This is a 2048x1536 pixel screenshot of macOS with Bruker TopSpin 5.0.\n"
+                            f"{question}\n\n"
+                            "Remember: scale perceived coordinates by 1.6 for 2048x1536 space.\n"
+                            "Return ONLY JSON, no markdown fences."
+                        ),
+                    },
+                ],
+            }
+        ],
     )
     return response.choices[0].message.content.strip()
 
 
 def ask_sonnet_coords(client: OpenAI, screenshot_b64: str, target: str) -> tuple[int, int] | None:
     """Ask Sonnet for coordinates of a UI element."""
-    text = ask_sonnet(client, screenshot_b64, f'Find the "{target}" button/element. Return: {{"x": N, "y": N}}')
+    text = ask_sonnet(
+        client, screenshot_b64, f'Find the "{target}" button/element. Return: {{"x": N, "y": N}}'
+    )
     mx = re.search(r'"x"\s*:\s*(\d+)', text)
     my = re.search(r'"y"\s*:\s*(\d+)', text)
     if mx and my:
@@ -241,7 +251,11 @@ def ask_sonnet_coords(client: OpenAI, screenshot_b64: str, target: str) -> tuple
 
 def ask_sonnet_verify(client: OpenAI, screenshot_b64: str, check: str) -> dict:
     """Ask Sonnet to verify a condition. Returns {"ok": bool, "description": str}."""
-    text = ask_sonnet(client, screenshot_b64, f'{check}\nReturn: {{"ok": true/false, "description": "what you see"}}')
+    text = ask_sonnet(
+        client,
+        screenshot_b64,
+        f'{check}\nReturn: {{"ok": true/false, "description": "what you see"}}',
+    )
     # Parse JSON from response
     m = re.search(r"\{[^}]+\}", text)
     if m:
@@ -254,6 +268,7 @@ def ask_sonnet_verify(client: OpenAI, screenshot_b64: str, check: str) -> dict:
 
 # ── Pipeline Steps ──────────────────────────────
 
+
 def step_open_topspin(vnc_addr: str, ai: OpenAI) -> bool:
     """Ensure TopSpin is open and visible."""
     push_log("▶ Open TopSpin", status="operating")
@@ -261,7 +276,11 @@ def step_open_topspin(vnc_addr: str, ai: OpenAI) -> bool:
     img, png = screenshot_and_push(vnc_addr)
     b64 = base64.b64encode(png).decode()
 
-    result = ask_sonnet_verify(ai, b64, "Is Bruker TopSpin 5.0 open and visible? Look for the TopSpin toolbar and title bar.")
+    result = ask_sonnet_verify(
+        ai,
+        b64,
+        "Is Bruker TopSpin 5.0 open and visible? Look for the TopSpin toolbar and title bar.",
+    )
     if result.get("ok"):
         push_log(f"  ✓ TopSpin already open: {result.get('description', '')}")
         return True
@@ -282,19 +301,30 @@ def step_open_topspin(vnc_addr: str, ai: OpenAI) -> bool:
     # Fallback: activate via SSH (handles cases where dock click didn't work)
     push_log("  Activating TopSpin via SSH...")
     subprocess.run(
-        ["sshpass", "-p", VM_PASS, "ssh", "-o", "StrictHostKeyChecking=no",
-         f"{VM_USER}@{_VM_IP}",
-         "open -a '/opt/topspin5.0.0/TopSpin 5.0.0.app'"],
-        capture_output=True, timeout=10,
+        [
+            "sshpass",
+            "-p",
+            VM_PASS,
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=no",
+            f"{VM_USER}@{_VM_IP}",
+            "open -a '/opt/topspin5.0.0/TopSpin 5.0.0.app'",
+        ],
+        capture_output=True,
+        timeout=10,
     )
     time.sleep(10)
 
     # Check for license dialog and accept it
     img, png = screenshot_and_push(vnc_addr)
     b64 = base64.b64encode(png).decode()
-    license_check = ask_sonnet_verify(ai, b64,
+    license_check = ask_sonnet_verify(
+        ai,
+        b64,
         "Is there a license agreement dialog visible? Look for 'I Accept' or 'License' text. "
-        "Set ok=true if you see a license dialog.")
+        "Set ok=true if you see a license dialog.",
+    )
     if license_check.get("ok"):
         push_log("  License dialog — accepting...")
         coords = ask_sonnet_coords(ai, b64, "'I Accept' button")
@@ -326,10 +356,13 @@ def step_load_dataset(vnc_addr: str, ai: OpenAI) -> bool:
     img, png = screenshot_and_push(vnc_addr)
     b64 = base64.b64encode(png).decode()
 
-    result = ask_sonnet_verify(ai, b64,
+    result = ask_sonnet_verify(
+        ai,
+        b64,
         "Has NMR data been loaded? Look for: a spectrum plot (FID or frequency domain) "
         "in the main panel, OR a molecular structure in the structure panel, OR dataset "
-        "info in the title area. 'No structure available' alone does NOT mean failure.")
+        "info in the title area. 'No structure available' alone does NOT mean failure.",
+    )
     if result.get("ok"):
         push_log(f"  ✓ Dataset loaded: {result.get('description', '')}")
         return True
@@ -345,9 +378,14 @@ def step_load_dataset(vnc_addr: str, ai: OpenAI) -> bool:
     return ok
 
 
-def step_run_command(vnc_addr: str, ai: OpenAI,
-                     cmd: str, step_name: str, verify_prompt: str,
-                     handle_dialog: bool = False) -> bool:
+def step_run_command(
+    vnc_addr: str,
+    ai: OpenAI,
+    cmd: str,
+    step_name: str,
+    verify_prompt: str,
+    handle_dialog: bool = False,
+) -> bool:
     """Run a TopSpin command and verify the result."""
     push_log(f"▶ {step_name}", status="operating")
 
@@ -360,10 +398,13 @@ def step_run_command(vnc_addr: str, ai: OpenAI,
     if handle_dialog:
         # Dismiss dialogs in a loop (nested errors may require multiple rounds)
         for _dlg in range(3):
-            dialog_check = ask_sonnet_verify(ai, b64,
+            dialog_check = ask_sonnet_verify(
+                ai,
+                b64,
                 "Is there a dialog/popup window visible in the CENTER of the screen? "
                 "NOT a macOS notification in the corner. Set ok=true ONLY for centered "
-                "dialogs with Close/OK/Cancel buttons.")
+                "dialogs with Close/OK/Cancel buttons.",
+            )
             if not dialog_check.get("ok"):
                 break
             push_log(f"  Dialog detected: {dialog_check.get('description', '')}")
@@ -387,13 +428,16 @@ def step_verify_result(vnc_addr: str, ai: OpenAI) -> bool:
     img, png = screenshot_and_push(vnc_addr)
     b64 = base64.b64encode(png).decode()
 
-    result = ask_sonnet_verify(ai, b64,
+    result = ask_sonnet_verify(
+        ai,
+        b64,
         "Describe the NMR spectrum visible in TopSpin. Report ok=true if you can see: "
         "(1) NMR peaks visible in the spectrum display area, "
         "(2) a chemical shift axis (ppm scale) at the bottom, "
         "(3) any peak annotations or red markers in the spectrum area. "
         "Ignore any error dialogs — focus only on the spectrum itself. "
-        "A dense pattern of red markers across the top IS valid peak picking output.")
+        "A dense pattern of red markers across the top IS valid peak picking output.",
+    )
     ok = result.get("ok", False)
     push_log(f"  {'✓' if ok else '⚠'} Final: {result.get('description', '')}")
     return ok
@@ -473,10 +517,13 @@ def main() -> int:
     crop = img.crop((0, 930, 700, 990))
     crop.save("/tmp/vnc_kbd_test.png")
     b64_test = base64.b64encode(png).decode()
-    caps_check = ask_sonnet_verify(ai, b64_test,
+    caps_check = ask_sonnet_verify(
+        ai,
+        b64_test,
         "Look at the command line text field at the very bottom of the window. "
         "Does it contain 'abc' (lowercase) or 'ABC' (uppercase)? "
-        "Set ok=true if lowercase 'abc', ok=false if uppercase 'ABC'.")
+        "Set ok=true if lowercase 'abc', ok=false if uppercase 'ABC'.",
+    )
     if not caps_check.get("ok"):
         push_log("  Caps lock detected — toggling off")
         vnc_key(vnc_addr, "caplk")
@@ -502,10 +549,13 @@ def main() -> int:
         time.sleep(0.5)
         img, png = screenshot_and_push(vnc_addr)
         b64 = base64.b64encode(png).decode()
-        dialog_check = ask_sonnet_verify(ai, b64,
+        dialog_check = ask_sonnet_verify(
+            ai,
+            b64,
             "Is there an error dialog, warning popup, license dialog, or modal window visible? "
             "NOT a regular application window and NOT a macOS notification banner in the corner. "
-            "Set ok=true ONLY if you see a centered popup/dialog with Close/OK/Cancel/Accept buttons.")
+            "Set ok=true ONLY if you see a centered popup/dialog with Close/OK/Cancel/Accept buttons.",
+        )
         if not dialog_check.get("ok"):
             break
         desc = dialog_check.get("description", "")
@@ -542,28 +592,37 @@ def main() -> int:
     time.sleep(2)
 
     # Step 3: Fourier Transform (efp)
-    ok = step_run_command(vnc_addr, ai,
+    ok = step_run_command(
+        vnc_addr,
+        ai,
         cmd="efp",
         step_name="Fourier Transform",
-        verify_prompt="Has the spectrum changed after Fourier transform? Look for frequency-domain peaks.")
+        verify_prompt="Has the spectrum changed after Fourier transform? Look for frequency-domain peaks.",
+    )
     results.append(("Fourier Transform", ok))
     time.sleep(2)
 
     # Step 4: Phase Correction (apk) — may show error dialog on some data
-    ok = step_run_command(vnc_addr, ai,
+    ok = step_run_command(
+        vnc_addr,
+        ai,
         cmd="apk",
         step_name="Phase Correction",
         verify_prompt="Has automatic phase correction been applied? Peaks should be upright and baseline flat.",
-        handle_dialog=True)
+        handle_dialog=True,
+    )
     results.append(("Phase Correction", ok))
     time.sleep(2)
 
     # Step 5: Peak Picking (pp) — may show dialog
-    ok = step_run_command(vnc_addr, ai,
+    ok = step_run_command(
+        vnc_addr,
+        ai,
         cmd="pp",
         step_name="Peak Picking",
         verify_prompt="Are peak annotations/labels visible on the spectrum? Look for red markers or numbers above peaks.",
-        handle_dialog=True)
+        handle_dialog=True,
+    )
     results.append(("Peak Picking", ok))
     time.sleep(2)
 
