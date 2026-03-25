@@ -30,6 +30,9 @@ Thumbs.db
 *.HEIC
 *.heic
 
+# Lab photos (moved to private backup)
+lab-instruments/jpg/
+
 # Reference repos (submodules)
 Agent-S/
 UFO/
