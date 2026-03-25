@@ -41,3 +41,12 @@ history_j.txt
 log/
 null/
 spectrum.png
+
+# Environment
+.env
+
+# Type checking
+.mypy_cache/
+
+# Lock files (managed per-environment)
+uv.lock
