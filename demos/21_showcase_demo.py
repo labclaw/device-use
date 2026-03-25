@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Investor Showcase Demo — AI-Powered NMR Experiment on Bruker TopSpin 5.0.
+"""Full Showcase Demo — AI-Powered NMR Experiment on Bruker TopSpin 5.0.
 
 A polished, never-crash demo that runs a complete NMR processing pipeline
-on a live TopSpin instance. Designed for investor/partner presentations.
+on a live TopSpin instance. Designed for presentations.
 
 Architecture (maximum reliability):
   - L3 AX API: read UI state (instant, deterministic)

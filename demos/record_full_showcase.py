@@ -2,13 +2,14 @@
 """Full showcase: Desktop → Launch TopSpin → Fullscreen → Process → Results.
 
 Records the complete experience from a clean macOS desktop through
-AI-driven NMR data processing. Designed for investor/pitch demos.
+AI-driven NMR data processing. Designed for showcase demos.
 
 Usage:
     # 1. Kill TopSpin first: ssh admin@VM 'pkill -9 java'
     # 2. Run deterministic path: python demos/record_full_showcase.py
     # 3. Optional VLM overlay: OPENROUTER_API_KEY=... python demos/record_full_showcase.py
 """
+
 from __future__ import annotations
 
 import base64
@@ -30,6 +31,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 try:
     from openai import OpenAI
+
     _OPENAI_IMPORT_ERROR: Exception | None = None
 except Exception as exc:
     OpenAI = Any  # type: ignore[misc,assignment]
@@ -52,8 +54,13 @@ CAPTURE_FPS = 3
 PLAYBACK_FPS = 3
 
 B, G, C, D, R, Y, RST = (
-    "\033[1m", "\033[32m", "\033[36m", "\033[2m",
-    "\033[31m", "\033[33m", "\033[0m",
+    "\033[1m",
+    "\033[32m",
+    "\033[36m",
+    "\033[2m",
+    "\033[31m",
+    "\033[33m",
+    "\033[0m",
 )
 
 _current_label = ""
@@ -73,11 +80,14 @@ def get_label() -> str:
 
 # ── VNC ─────────────────────────────────────────
 
+
 def _vncdo(*args: str, timeout: int = 20) -> subprocess.CompletedProcess:
     vncdo = resolve_vncdo_binary()
     result = subprocess.run(
         [vncdo, "-s", VM_IP, "--username", VNC_USER, "--password", VNC_PASS, *args],
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
@@ -114,13 +124,29 @@ def vnc_click(x: int, y: int) -> None:
 
 def vnc_type_command(cmd: str) -> None:
     _vncdo(
-        "move", str(CMD_X), str(CMD_Y),
-        "pause", "0.2",
-        "click", "1", "pause", "0.05",
-        "click", "1", "pause", "0.05",
-        "click", "1", "pause", "0.3",
-        "type", cmd, "pause", "0.3",
-        "key", "return",
+        "move",
+        str(CMD_X),
+        str(CMD_Y),
+        "pause",
+        "0.2",
+        "click",
+        "1",
+        "pause",
+        "0.05",
+        "click",
+        "1",
+        "pause",
+        "0.05",
+        "click",
+        "1",
+        "pause",
+        "0.3",
+        "type",
+        cmd,
+        "pause",
+        "0.3",
+        "key",
+        "return",
     )
 
 
@@ -135,23 +161,43 @@ def vnc_fullscreen() -> None:
     Red x~36, Yellow x~76, Green x~114.
     """
     _vncdo(
-        "move", "36", "70", "pause", "0.5",    # hover over red to reveal buttons
-        "move", "114", "70", "pause", "0.3",   # move to green button
-        "click", "1",
+        "move",
+        "36",
+        "70",
+        "pause",
+        "0.5",  # hover over red to reveal buttons
+        "move",
+        "114",
+        "70",
+        "pause",
+        "0.3",  # move to green button
+        "click",
+        "1",
     )
 
 
 # ── SSH (shell commands) ───────────────────────
 
+
 def cua_run(command: str) -> dict:
     """Run shell command on VM via SSH."""
     try:
         r = subprocess.run(
-            ["sshpass", "-p", VNC_PASS, "ssh",
-             "-o", "StrictHostKeyChecking=no",
-             "-o", "ConnectTimeout=5",
-             f"{VNC_USER}@{VM_IP}", command],
-            capture_output=True, text=True, timeout=30,
+            [
+                "sshpass",
+                "-p",
+                VNC_PASS,
+                "ssh",
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "ConnectTimeout=5",
+                f"{VNC_USER}@{VM_IP}",
+                command,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return {"success": r.returncode == 0, "stdout": r.stdout, "stderr": r.stderr}
     except Exception as e:
@@ -159,6 +205,7 @@ def cua_run(command: str) -> dict:
 
 
 # ── VLM ─────────────────────────────────────────
+
 
 def screenshot_b64() -> str:
     img = vnc_screenshot()
@@ -170,14 +217,23 @@ def screenshot_b64() -> str:
 
 def ask_verify(ai: OpenAI, b64: str, check: str) -> dict:
     response = ai.chat.completions.create(
-        model=MODEL, max_tokens=256,
-        messages=[{"role": "user", "content": [
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-            {"type": "text", "text": (
-                f"TopSpin 5.0 NMR screenshot (1280x960). {check}\n"
-                'Return ONLY: {"ok": true/false, "desc": "brief"}'
-            )},
-        ]}],
+        model=MODEL,
+        max_tokens=256,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                    {
+                        "type": "text",
+                        "text": (
+                            f"TopSpin 5.0 NMR screenshot (1280x960). {check}\n"
+                            'Return ONLY: {"ok": true/false, "desc": "brief"}'
+                        ),
+                    },
+                ],
+            }
+        ],
     )
     text = response.choices[0].message.content.strip()
     m = re.search(r"\{[^}]+\}", text)
@@ -371,6 +427,7 @@ def verify_checkpoint(
 
 # ── Label Overlay ───────────────────────────────
 
+
 def add_label_overlay(img: Image.Image, label: str) -> Image.Image:
     if not label:
         return img
@@ -401,6 +458,7 @@ def add_label_overlay(img: Image.Image, label: str) -> Image.Image:
 
 
 # ── Frame Recorder ──────────────────────────────
+
 
 class FrameRecorder:
     def __init__(self, fps: float = 3.0):
@@ -445,6 +503,7 @@ class FrameRecorder:
 
 # ── Pipeline ────────────────────────────────────
 
+
 def log(msg: str) -> None:
     ts = datetime.now().strftime("%H:%M:%S")
     print(f"  {D}[{ts}]{RST} {msg}")
@@ -473,8 +532,12 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
 
     log("  Typing TopSpin launch command...")
     _vncdo(
-        "type", "/opt/topspin5.0.0/topspin &",
-        "pause", "0.5", "key", "return",
+        "type",
+        "/opt/topspin5.0.0/topspin &",
+        "pause",
+        "0.5",
+        "key",
+        "return",
     )
     time.sleep(3)
 
@@ -486,7 +549,7 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
         r = cua_run("pgrep java > /dev/null && echo YES || echo NO")
         if "YES" in r.get("stdout", ""):
             java_ok = True
-            log(f"  Java started at {(i+1)*3}s")
+            log(f"  Java started at {(i + 1) * 3}s")
             break
     if not java_ok:
         log(f"  {R}Java never started{RST}")
@@ -508,7 +571,8 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
     v = verify_checkpoint(
         ai,
         "Is TopSpin 5.0 main window visible with toolbar and command line?",
-        deterministic_ok=java_ok and (vm_any_process_running("topspin") or vm_any_process_running("java")),
+        deterministic_ok=java_ok
+        and (vm_any_process_running("topspin") or vm_any_process_running("java")),
         deterministic_desc="java process detected and VNC capture succeeded",
     )
     results.append(("Launch TopSpin", v.get("ok", False)))
@@ -533,7 +597,8 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
     # continue without gating on this auxiliary panel.
     if ai is not None:
         v_find = ask_verify(
-            ai, screenshot_b64(),
+            ai,
+            screenshot_b64(),
             "Is there a 'Find data' panel/dialog showing a list of datasets? "
             "(NOT the normal TopSpin view with spectrum area)",
         )
@@ -613,9 +678,16 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
     log(f"{B}Act 4a: Fourier Transform{RST}")
     time.sleep(2)
 
-    efp_before = snapshot_mtimes([
-        paths["1r"], paths["1i"], paths["proc"], paths["procs"], paths["auditp"], paths["thumb"],
-    ])
+    efp_before = snapshot_mtimes(
+        [
+            paths["1r"],
+            paths["1i"],
+            paths["proc"],
+            paths["procs"],
+            paths["auditp"],
+            paths["thumb"],
+        ]
+    )
     vnc_type_command("efp")
     ok_efp, desc_efp = verify_file_change_or_existing(
         [paths["1r"], paths["1i"], paths["proc"], paths["procs"], paths["auditp"], paths["thumb"]],
@@ -641,14 +713,24 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
     log(f"{B}Act 4b: Phase Correction{RST}")
     time.sleep(2)
 
-    apk_before = snapshot_mtimes([
-        paths["proc"], paths["procs"], paths["auditp"], paths["thumb"], paths["1r"],
-    ])
+    apk_before = snapshot_mtimes(
+        [
+            paths["proc"],
+            paths["procs"],
+            paths["auditp"],
+            paths["thumb"],
+            paths["1r"],
+        ]
+    )
     vnc_type_command("apk")
     time.sleep(5)
 
     # Handle dialog
-    v_dlg = ask_verify(ai, screenshot_b64(), "Is there a centered dialog/popup?") if ai else {"ok": False}
+    v_dlg = (
+        ask_verify(ai, screenshot_b64(), "Is there a centered dialog/popup?")
+        if ai
+        else {"ok": False}
+    )
     if v_dlg.get("ok"):
         log("  Dismissing dialog...")
         vnc_key("return")
@@ -678,21 +760,39 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
     log(f"{B}Act 4c: Peak Picking{RST}")
     time.sleep(2)
 
-    pp_before = snapshot_mtimes([
-        paths["peaks"], paths["peaklist"], paths["peakrng"], paths["auditp"], paths["thumb"], paths["procs"],
-    ])
+    pp_before = snapshot_mtimes(
+        [
+            paths["peaks"],
+            paths["peaklist"],
+            paths["peakrng"],
+            paths["auditp"],
+            paths["thumb"],
+            paths["procs"],
+        ]
+    )
     vnc_type_command("pp")
     time.sleep(5)
 
     # Handle dialog
-    v_dlg = ask_verify(ai, screenshot_b64(), "Is there a centered dialog/popup?") if ai else {"ok": False}
+    v_dlg = (
+        ask_verify(ai, screenshot_b64(), "Is there a centered dialog/popup?")
+        if ai
+        else {"ok": False}
+    )
     if v_dlg.get("ok"):
         log("  Dismissing dialog...")
         vnc_key("return")
         time.sleep(3)
 
     ok_pp, desc_pp = verify_file_change_or_existing(
-        [paths["peaks"], paths["peaklist"], paths["peakrng"], paths["auditp"], paths["thumb"], paths["procs"]],
+        [
+            paths["peaks"],
+            paths["peaklist"],
+            paths["peakrng"],
+            paths["auditp"],
+            paths["thumb"],
+            paths["procs"],
+        ],
         pp_before,
         timeout_sec=20,
         require_all_existing=False,
@@ -718,7 +818,10 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
     log(f"{B}Act 5: Final Verification{RST}")
     time.sleep(3)
 
-    final_ok = all(vm_path_exists(path) for path in [paths["1r"], paths["proc"], paths["procs"], paths["peaks"]])
+    final_ok = all(
+        vm_path_exists(path)
+        for path in [paths["1r"], paths["proc"], paths["procs"], paths["peaks"]]
+    )
     v = verify_checkpoint(
         ai,
         "Describe the NMR spectrum. Are peaks visible with annotations and ppm axis?",
@@ -740,6 +843,7 @@ def run_full_pipeline(ai: OpenAI | None) -> list[tuple[str, bool]]:
 
 # ── Video Assembly ──────────────────────────────
 
+
 def assemble(frame_count: int) -> tuple[str, str, str]:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -749,46 +853,99 @@ def assemble(frame_count: int) -> tuple[str, str, str]:
     gif = str(OUTPUT_DIR / f"labclaw_full_{timestamp}.gif")
 
     # 1080p MP4
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-framerate", str(PLAYBACK_FPS),
-        "-i", str(FRAMES_DIR / "frame_%06d.png"),
-        "-vf", "scale=1440:1080:flags=lanczos",
-        "-c:v", "libx264", "-preset", "slow", "-crf", "14",
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4,
-    ], capture_output=True, timeout=300)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-framerate",
+            str(PLAYBACK_FPS),
+            "-i",
+            str(FRAMES_DIR / "frame_%06d.png"),
+            "-vf",
+            "scale=1440:1080:flags=lanczos",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "slow",
+            "-crf",
+            "14",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            mp4,
+        ],
+        capture_output=True,
+        timeout=300,
+    )
 
     # 4K MP4 (native 2048x1536)
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-framerate", str(PLAYBACK_FPS),
-        "-i", str(FRAMES_DIR / "frame_%06d.png"),
-        "-c:v", "libx264", "-preset", "slow", "-crf", "16",
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4_4k,
-    ], capture_output=True, timeout=300)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-framerate",
+            str(PLAYBACK_FPS),
+            "-i",
+            str(FRAMES_DIR / "frame_%06d.png"),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "slow",
+            "-crf",
+            "16",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            mp4_4k,
+        ],
+        capture_output=True,
+        timeout=300,
+    )
 
     # GIF (palette-optimized)
     palette = str(OUTPUT_DIR / "palette.png")
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-framerate", str(PLAYBACK_FPS),
-        "-i", str(FRAMES_DIR / "frame_%06d.png"),
-        "-vf", f"fps={PLAYBACK_FPS},scale=960:720:flags=lanczos,palettegen=max_colors=128",
-        palette,
-    ], capture_output=True, timeout=120)
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-framerate", str(PLAYBACK_FPS),
-        "-i", str(FRAMES_DIR / "frame_%06d.png"),
-        "-i", palette,
-        "-lavfi", f"fps={PLAYBACK_FPS},scale=960:720:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer",
-        "-loop", "0", gif,
-    ], capture_output=True, timeout=300)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-framerate",
+            str(PLAYBACK_FPS),
+            "-i",
+            str(FRAMES_DIR / "frame_%06d.png"),
+            "-vf",
+            f"fps={PLAYBACK_FPS},scale=960:720:flags=lanczos,palettegen=max_colors=128",
+            palette,
+        ],
+        capture_output=True,
+        timeout=120,
+    )
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-framerate",
+            str(PLAYBACK_FPS),
+            "-i",
+            str(FRAMES_DIR / "frame_%06d.png"),
+            "-i",
+            palette,
+            "-lavfi",
+            f"fps={PLAYBACK_FPS},scale=960:720:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer",
+            "-loop",
+            "0",
+            gif,
+        ],
+        capture_output=True,
+        timeout=300,
+    )
 
     return mp4, mp4_4k, gif
 
 
 # ── Main ────────────────────────────────────────
+
 
 def main() -> int:
     print(
@@ -812,7 +969,9 @@ def main() -> int:
 
     if ai is None:
         if _OPENAI_IMPORT_ERROR is not None:
-            print(f"  {Y}WARN: openai package unavailable ({_OPENAI_IMPORT_ERROR}) — deterministic path only{RST}")
+            print(
+                f"  {Y}WARN: openai package unavailable ({_OPENAI_IMPORT_ERROR}) — deterministic path only{RST}"
+            )
         else:
             print(f"  {Y}WARN: No API key found — running deterministic control path only{RST}")
     else:
@@ -820,8 +979,16 @@ def main() -> int:
 
     # Ensure clean state — kill all TopSpin processes for reproducibility
     print("  Cleaning VM state...")
-    for proc in ["java", "cpr", "cprclient", "dataserver", "restartserver",
-                  "toolserver", "osascript", "applet"]:
+    for proc in [
+        "java",
+        "cpr",
+        "cprclient",
+        "dataserver",
+        "restartserver",
+        "toolserver",
+        "osascript",
+        "applet",
+    ]:
         cua_run(f"pkill -9 {proc} 2>/dev/null")
     time.sleep(2)
     cua_run(
@@ -832,7 +999,7 @@ def main() -> int:
     # Pre-approve TCC permission to prevent System Events dialogs
     cua_run(
         "sudo sqlite3 '/Library/Application Support/com.apple.TCC/TCC.db' "
-        "\"INSERT OR REPLACE INTO access (service, client, client_type, auth_value, "
+        '"INSERT OR REPLACE INTO access (service, client, client_type, auth_value, '
         "auth_reason, auth_version, indirect_object_identifier, "
         "indirect_object_identifier_type, flags) VALUES "
         "('kTCCServiceAppleEvents', '/usr/libexec/sshd-keygen-wrapper', "

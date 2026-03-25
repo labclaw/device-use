@@ -7,7 +7,7 @@
   开发 → 必须在实验室 PC 上 → 时间受限 → 迭代慢 → demo 依赖物理设备
 
 有模拟模式:
-  开发 → 任何电脑, 任何时间 → 快速迭代 → demo 随时可跑 → 投资人面前 live demo
+  开发 → 任何电脑, 任何时间 → 快速迭代 → demo 随时可跑 → live demo
 ```
 
 **核心问题: 哪些仪器软件可以在没有物理仪器的情况下，跑通 "设计 → 设置 → 运行 → 出数据 → 导出" 的完整闭环？**
@@ -85,7 +85,7 @@ Tecan 是实验室自动化行业龙头
 - 3D 模拟器可以展示完整的机器人工作流
 - Fast Simulation Mode → demo 不用等真实运行时间
 - 视觉效果: 3D 机器人在屏幕上移液 = 非常 impressive
-- 投资人能直观看到 "AI 操控机器人"
+- 能直观看到 "AI 操控机器人"
 
 问题: 软件获取难度高 (商业, 需要联系 Tecan)
 ```
@@ -386,7 +386,7 @@ NMR 是化学/药学的核心分析手段:
 
 **优势:**
 - 今天就可以开始开发
-- 100% 可在投资人面前 live demo
+- 100% 可 live demo
 - 两种不同的 GUI (Electron + Qt) → 展示泛化能力
 - 开源 × 开源 → 完美的 "open science" 叙事
 
@@ -464,7 +464,7 @@ NMR 是化学/药学的核心分析手段:
 ├── 10 次 AI 自主实验 vs 10 次人类实验
 ├── 统计分析 → paper figures
 ├── Demo 视频录制
-└── 产出: Nature Methods 投稿 + investor demo video
+└── 产出: Nature Methods 投稿 + demo video
 ```
 
 **为什么这是最优策略:**
@@ -473,7 +473,7 @@ NMR 是化学/药学的核心分析手段:
 "先模拟后真机" = 风险最低, 速度最快
 
 Week 1-2 成果:
-├── 可以给投资人演示 (Opentrons 模拟闭环)
+├── 可以演示 (Opentrons 模拟闭环)
 ├── 核心框架已就绪 (Agent, Cloud, 集成)
 └── 不依赖 lab PC 时间
 
@@ -541,8 +541,8 @@ Wet Lab Pipeline:
 ### 仪器选择的核心标准 (对 Device-Use demo)
 
 ```
-                           可模拟  GUI 可    输出可     科学     对投资人
-                           闭环?   自动化?   AI 分析?   价值     理解度
+                           可模拟  GUI 可    输出可     科学     易理解
+                           闭环?   自动化?   AI 分析?   价值     程度
 Opentrons (液体处理)        ★★★★★  ★★★★    ★★★       ★★★★   ★★★★
 Tecan Magellan (Plate Rdr)  ★★★★   ★★★     ★★★★★    ★★★★   ★★★★
 qPCR (StepOne/QuantStudio)  ★★     ★★★★    ★★★★★    ★★★★★  ★★★

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Showcase — all device-use features in one script.
 
-The "pitch deck" demo:
+The showcase demo:
   1. One-line orchestrator setup
   2. Plugin discovery + instrument registration
   3. Pipeline composition from reusable sub-pipelines
@@ -48,8 +48,8 @@ def main():
     dt = time.time() - t0
     instruments = orch.registry.list_instruments()
     tools = orch.registry.list_tools()
-    print(f"     from device_use import create_orchestrator")
-    print(f"     orch = create_orchestrator()")
+    print("     from device_use import create_orchestrator")
+    print("     orch = create_orchestrator()")
     print(f"     → {len(instruments)} instruments, {len(tools)} tools in {dt:.2f}s\n")
 
     # ── 2. Instruments & Tools ──────────────────────────────────
@@ -67,23 +67,29 @@ def main():
     datasets = orch.call_tool("topspin.list_datasets")
 
     load = Pipeline("load", description="Load and process NMR data")
-    load.add_step(PipelineStep(
-        name="process_nmr",
-        tool_name="topspin.process",
-        params={"data_path": datasets[0]["path"]},
-    ))
+    load.add_step(
+        PipelineStep(
+            name="process_nmr",
+            tool_name="topspin.process",
+            params={"data_path": datasets[0]["path"]},
+        )
+    )
 
     analyze = Pipeline("analyze", description="AI + library matching")
-    analyze.add_step(PipelineStep(
-        name="library_match",
-        handler=lambda ctx: _match_library(ctx["process_nmr"]),
-    ))
+    analyze.add_step(
+        PipelineStep(
+            name="library_match",
+            handler=lambda ctx: _match_library(ctx["process_nmr"]),
+        )
+    )
 
     plate = Pipeline("plate_reader", description="Cross-instrument data")
-    plate.add_step(PipelineStep(
-        name="plate_data",
-        tool_name="platereader.list_datasets",
-    ))
+    plate.add_step(
+        PipelineStep(
+            name="plate_data",
+            tool_name="platereader.list_datasets",
+        )
+    )
 
     full = Pipeline.compose("multi_instrument_analysis", load, analyze, plate)
     print(f"\n{full.describe()}\n")
@@ -92,12 +98,8 @@ def main():
     print("  4. MIDDLEWARE HOOKS (safety + audit)")
     audit_log = []
 
-    orch.before_step(lambda step, ctx: audit_log.append(
-        f"    [AUDIT] Starting: {step.name}"
-    ))
-    orch.after_step(lambda step, ctx: audit_log.append(
-        f"    [AUDIT] Completed: {step.name}"
-    ))
+    orch.before_step(lambda step, ctx: audit_log.append(f"    [AUDIT] Starting: {step.name}"))
+    orch.after_step(lambda step, ctx: audit_log.append(f"    [AUDIT] Completed: {step.name}"))
 
     # ── 5. Execute with Visualization ───────────────────────────
     print("  5. PIPELINE EXECUTION")
@@ -109,7 +111,7 @@ def main():
         print(entry)
 
     # ── 7. Spectral Library ─────────────────────────────────────
-    print(f"\n  7. SPECTRAL LIBRARY")
+    print("\n  7. SPECTRAL LIBRARY")
     spectrum = result.outputs.get("process_nmr")
     if spectrum:
         matches = result.outputs.get("library_match", [])
@@ -121,7 +123,7 @@ def main():
                 print(f"     {i}. {m.entry.name:<30} {m.score:.0%} {bar}")
 
     # ── 8. Parallel Speedup ─────────────────────────────────────
-    print(f"\n  8. PARALLEL EXECUTION")
+    print("\n  8. PARALLEL EXECUTION")
     import time as _time
 
     def io_step(ctx, delay=0.05):
@@ -149,7 +151,7 @@ def main():
     print(f"     Speedup:    {speedup:.1f}x")
 
     # ── 9. Retry/Timeout ────────────────────────────────────────
-    print(f"\n  9. RETRY + TIMEOUT")
+    print("\n  9. RETRY + TIMEOUT")
     call_count = [0]
 
     def flaky(ctx):
@@ -159,12 +161,14 @@ def main():
         return "recovered"
 
     retry_pipeline = Pipeline("resilience")
-    retry_pipeline.add_step(PipelineStep(
-        name="flaky_instrument",
-        handler=flaky,
-        retries=3,
-        timeout_s=5.0,
-    ))
+    retry_pipeline.add_step(
+        PipelineStep(
+            name="flaky_instrument",
+            handler=flaky,
+            retries=3,
+            timeout_s=5.0,
+        )
+    )
 
     orch3 = create_orchestrator(connect=False)
     retry_result = orch3.run(retry_pipeline)
@@ -180,8 +184,8 @@ def main():
 ║  Instruments:     {len(instruments):<42}║
 ║  Tools:           {len(tools):<42}║
 ║  Pipeline steps:  {len(full):<42}║
-║  Parallel speed:  {speedup:.1f}x{' ' * 39}║
-║  Tests passing:   355{' ' * 38}║
+║  Parallel speed:  {speedup:.1f}x{" " * 39}║
+║  Tests passing:   355{" " * 38}║
 ║                                                              ║
 ║  Architecture: Orchestrator + Pipeline + Events + Hooks      ║
 ║  Modes:        API (gRPC) | GUI (Computer Use) | Offline     ║
