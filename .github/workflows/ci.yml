@@ -17,7 +17,7 @@ permissions:
 jobs:
   lint:
     name: Lint & Format
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     continue-on-error: true  # TODO: fix 17 pre-existing lint errors then remove
     steps:
@@ -27,18 +27,15 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@a2a8b00df0aa22a77a33ee5f956c2128661fabeb # v7
 
-      - name: Install dependencies
-        run: uv sync --extra dev
-
       - name: Ruff check
-        run: uv run ruff check src/ tests/
+        run: uvx ruff check src/ tests/
 
       - name: Ruff format check
-        run: uv run ruff format --check src/ tests/
+        run: uvx ruff format --check src/ tests/
 
   test:
     name: Test (py${{ matrix.python-version }})
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [lint]
     strategy:
@@ -69,7 +66,7 @@ jobs:
 
   package:
     name: Package Build
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [test]
     steps:
