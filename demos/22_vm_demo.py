@@ -18,6 +18,7 @@ Usage:
     # 4. Run demo:    python demos/22_vm_demo.py
     # 5. Watch:       open http://localhost:8430 -> Live VM tab
 """
+
 from __future__ import annotations
 
 import base64
@@ -34,9 +35,9 @@ from openai import OpenAI
 from PIL import Image
 
 # ── Config ──────────────────────────────────────
-VM_IP = os.environ.get("VM_IP", "192.168.64.13")
-VNC_USER = os.environ.get("VNC_USER", "admin")
-VNC_PASS = os.environ.get("VNC_PASS", "admin")
+VM_IP = os.environ.get("VM_IP", "10.0.0.1")
+VNC_USER = os.environ.get("VNC_USER", "changeme")
+VNC_PASS = os.environ.get("VNC_PASS", "changeme")
 CUA_URL = f"http://{VM_IP}:8000/cmd"  # For run_command only
 MODEL = "anthropic/claude-sonnet-4.6"
 LABWORK_URL = os.environ.get("LABWORK_URL", "http://localhost:8430")
@@ -59,15 +60,20 @@ RST = "\033[0m"
 
 # ── VNC helpers (via vncdo CLI) ─────────────────
 
+
 def _vncdo(*args: str, timeout: int = 15) -> subprocess.CompletedProcess:
     """Run vncdo command with ARD auth credentials."""
     cmd = [
         sys.executable.replace("python", "vncdo").replace(
-            "bin/python", "bin/vncdo",
+            "bin/python",
+            "bin/vncdo",
         ),
-        "-s", VM_IP,
-        "--username", VNC_USER,
-        "--password", VNC_PASS,
+        "-s",
+        VM_IP,
+        "--username",
+        VNC_USER,
+        "--password",
+        VNC_PASS,
         *args,
     ]
     # Fallback: find vncdo next to python
@@ -106,17 +112,29 @@ def vnc_type_command(cmd: str) -> None:
     """
     # Triple-click to select all text in command line, then type + Return
     _vncdo(
-        "move", str(CMD_X), str(CMD_Y),
-        "pause", "0.2",
-        "click", "1",
-        "pause", "0.05",
-        "click", "1",
-        "pause", "0.05",
-        "click", "1",
-        "pause", "0.3",
-        "type", cmd,
-        "pause", "0.3",
-        "key", "return",
+        "move",
+        str(CMD_X),
+        str(CMD_Y),
+        "pause",
+        "0.2",
+        "click",
+        "1",
+        "pause",
+        "0.05",
+        "click",
+        "1",
+        "pause",
+        "0.05",
+        "click",
+        "1",
+        "pause",
+        "0.3",
+        "type",
+        cmd,
+        "pause",
+        "0.3",
+        "key",
+        "return",
     )
 
 
@@ -124,6 +142,7 @@ def vnc_type_command(cmd: str) -> None:
 #
 # CUA keyboard/mouse don't reach Java/Swing apps in macOS VMs.
 # We only use CUA for run_command (launching apps, killing processes).
+
 
 def _cua_cmd(command: str, params: dict | None = None) -> dict:
     """Send a command to CUA server, return parsed response."""
@@ -144,6 +163,7 @@ def cua_run(command: str) -> dict:
 
 
 # ── Stream helpers ──────────────────────────────
+
 
 def push_frame(jpeg_bytes: bytes) -> None:
     """Push a JPEG frame to labwork-web MJPEG stream."""
@@ -190,41 +210,47 @@ def screenshot_and_push() -> tuple[str, bytes]:
 
 # ── VLM ─────────────────────────────────────────
 
+
 def ask_sonnet(client: OpenAI, screenshot_b64: str, question: str) -> str:
     """Send screenshot + question to Sonnet 4.6, get text response."""
     response = client.chat.completions.create(
         model=MODEL,
         max_tokens=512,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{screenshot_b64}",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{screenshot_b64}",
+                        },
                     },
-                },
-                {
-                    "type": "text",
-                    "text": (
-                        "This is a 1280x960 screenshot of macOS with "
-                        "Bruker TopSpin 5.0 NMR software.\n"
-                        f"{question}\n\n"
-                        "Return ONLY JSON, no markdown fences."
-                    ),
-                },
-            ],
-        }],
+                    {
+                        "type": "text",
+                        "text": (
+                            "This is a 1280x960 screenshot of macOS with "
+                            "Bruker TopSpin 5.0 NMR software.\n"
+                            f"{question}\n\n"
+                            "Return ONLY JSON, no markdown fences."
+                        ),
+                    },
+                ],
+            }
+        ],
     )
     return response.choices[0].message.content.strip()
 
 
 def ask_verify(
-    client: OpenAI, screenshot_b64: str, check: str,
+    client: OpenAI,
+    screenshot_b64: str,
+    check: str,
 ) -> dict:
     """Ask Sonnet to verify a condition."""
     text = ask_sonnet(
-        client, screenshot_b64,
+        client,
+        screenshot_b64,
         f'{check}\nReturn: {{"ok": true/false, "description": "what you see"}}',
     )
     m = re.search(r"\{[^}]+\}", text)
@@ -238,6 +264,7 @@ def ask_verify(
 
 # ── Pipeline Steps ──────────────────────────────
 
+
 def step_ensure_topspin(ai: OpenAI) -> bool:
     """Ensure TopSpin is open and visible."""
     push_log(">>> Ensure TopSpin visible", status="operating")
@@ -247,7 +274,8 @@ def step_ensure_topspin(ai: OpenAI) -> bool:
 
     b64, _ = screenshot_and_push()
     result = ask_verify(
-        ai, b64,
+        ai,
+        b64,
         "Is Bruker TopSpin 5.0 open with its main window visible? "
         "Look for the TopSpin toolbar, spectrum area, and command line.",
     )
@@ -282,7 +310,8 @@ def step_load_dataset(ai: OpenAI) -> bool:
 
     b64, _ = screenshot_and_push()
     result = ask_verify(
-        ai, b64,
+        ai,
+        b64,
         "Has NMR data been loaded? Look for a spectrum plot "
         "(FID or frequency domain) in the main panel, OR dataset "
         "info in the title area.",
@@ -296,7 +325,9 @@ def step_load_dataset(ai: OpenAI) -> bool:
     time.sleep(5)
     b64, _ = screenshot_and_push()
     result = ask_verify(
-        ai, b64, "Is there ANY spectrum or data displayed in TopSpin?",
+        ai,
+        b64,
+        "Is there ANY spectrum or data displayed in TopSpin?",
     )
     ok = result.get("ok", False)
     push_log(f"  {'OK' if ok else 'WARN'} {result.get('description', '')}")
@@ -321,7 +352,8 @@ def step_run_command(
     if handle_dialog:
         for _dlg in range(3):
             dlg = ask_verify(
-                ai, b64,
+                ai,
+                b64,
                 "Is there a dialog/popup window visible in the CENTER? "
                 "NOT a notification. Set ok=true ONLY for centered "
                 "dialogs with Close/OK/Cancel buttons.",
@@ -336,8 +368,7 @@ def step_run_command(
     result = ask_verify(ai, b64, verify_prompt)
     ok = result.get("ok", False)
     push_log(
-        f"  {'OK' if ok else 'WARN'} {step_name}: "
-        f"{result.get('description', '')}",
+        f"  {'OK' if ok else 'WARN'} {step_name}: {result.get('description', '')}",
     )
     return ok
 
@@ -348,7 +379,8 @@ def step_verify_result(ai: OpenAI) -> bool:
 
     b64, _ = screenshot_and_push()
     result = ask_verify(
-        ai, b64,
+        ai,
+        b64,
         "Describe the NMR spectrum visible in TopSpin. Report ok=true "
         "if you can see: (1) NMR peaks in the spectrum display, "
         "(2) a chemical shift axis (ppm) at the bottom, "
@@ -361,6 +393,7 @@ def step_verify_result(ai: OpenAI) -> bool:
 
 
 # ── Main ────────────────────────────────────────
+
 
 def main() -> int:
     print(
@@ -375,7 +408,11 @@ def main() -> int:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         env_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "labwork-web", ".env",
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "labwork-web",
+            ".env",
         )
         if os.path.exists(env_path):
             with open(env_path) as f:
@@ -431,8 +468,7 @@ def main() -> int:
         cmd="efp",
         step_name="Fourier Transform",
         verify_prompt=(
-            "Has the spectrum changed after Fourier transform? "
-            "Look for frequency-domain peaks."
+            "Has the spectrum changed after Fourier transform? Look for frequency-domain peaks."
         ),
     )
     results.append(("Fourier Transform", ok))

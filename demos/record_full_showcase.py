@@ -38,9 +38,9 @@ except Exception as exc:
     _OPENAI_IMPORT_ERROR = exc
 
 # ── Config ──────────────────────────────────────
-VM_IP = os.environ.get("VM_IP", "192.168.64.13")
-VNC_USER = os.environ.get("VNC_USER", "admin")
-VNC_PASS = os.environ.get("VNC_PASS", "admin")
+VM_IP = os.environ.get("VM_IP", "10.0.0.1")
+VNC_USER = os.environ.get("VNC_USER", "changeme")
+VNC_PASS = os.environ.get("VNC_PASS", "changeme")
 MODEL = "anthropic/claude-sonnet-4.6"
 DATASET = os.environ.get(
     "TOPSPIN_DATASET",
