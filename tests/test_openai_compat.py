@@ -66,9 +66,7 @@ class TestOpenAICompatBackendInitialization:
         assert backend.system_prompt == ""
         assert backend._previous_response_id is None
 
-        mock_openai_cls.assert_called_once_with(
-            api_key="test_key", base_url="http://test.url"
-        )
+        mock_openai_cls.assert_called_once_with(api_key="test_key", base_url="http://test.url")
 
     def test_default_values(self, mock_async_openai):
         mock_openai_cls, mock_async_openai_instance = mock_async_openai
