@@ -15,9 +15,9 @@ from device_use.backends.openai_compat import (
 @pytest.fixture
 def mock_async_openai():
     """Fixture to mock AsyncOpenAI client."""
-    with patch("device_use.backends.openai_compat.AsyncOpenAI") as MockAsyncOpenAI:
-        mock_client = MockAsyncOpenAI.return_value
-        yield MockAsyncOpenAI, mock_client
+    with patch("device_use.backends.openai_compat.AsyncOpenAI") as mock_openai_cls:
+        mock_client = mock_openai_cls.return_value
+        yield mock_openai_cls, mock_client
 
 
 class TestSupportsComputerUse:
@@ -55,8 +55,8 @@ class TestOpenAICompatBackendInitialization:
         ],
     )
     def test_initialization(self, mock_async_openai, model, expected_native_cu):
-        MockAsyncOpenAI_class, mock_async_openai_instance = mock_async_openai
-        MockAsyncOpenAI_class.reset_mock()
+        mock_openai_cls, mock_async_openai_instance = mock_async_openai
+        mock_openai_cls.reset_mock()
         backend = OpenAICompatBackend(model=model, api_key="test_key", base_url="http://test.url")
 
         assert backend._model == model
@@ -66,19 +66,17 @@ class TestOpenAICompatBackendInitialization:
         assert backend.system_prompt == ""
         assert backend._previous_response_id is None
 
-        MockAsyncOpenAI_class.assert_called_once_with(
-            api_key="test_key", base_url="http://test.url"
-        )
+        mock_openai_cls.assert_called_once_with(api_key="test_key", base_url="http://test.url")
 
     def test_default_values(self, mock_async_openai):
-        MockAsyncOpenAI_class, mock_async_openai_instance = mock_async_openai
+        mock_openai_cls, mock_async_openai_instance = mock_async_openai
         backend = OpenAICompatBackend(api_key="test_key")  # Add api_key here
         assert backend._model == "gpt-5.4"
         assert backend._max_tokens == 4096
         assert backend._native_cu is True  # gpt-5.4 is default
 
     def test_supports_grounding_property(self, mock_async_openai):
-        MockAsyncOpenAI_class, mock_async_openai_instance = mock_async_openai
+        mock_openai_cls, mock_async_openai_instance = mock_async_openai
         cu_backend = OpenAICompatBackend(model="gpt-5.4", api_key="test_key")
         assert cu_backend.supports_grounding is True
 
@@ -87,7 +85,7 @@ class TestOpenAICompatBackendInitialization:
 
     @pytest.fixture(autouse=True)
     def setup(self, mock_async_openai):
-        MockAsyncOpenAI_class, self.mock_client = mock_async_openai
+        mock_openai_cls, self.mock_client = mock_async_openai
         self.cu_backend = OpenAICompatBackend(model="gpt-5.4", api_key="test_key")
         self.mock_responses_create = AsyncMock()
         self.mock_client.responses.create = self.mock_responses_create
@@ -272,7 +270,7 @@ class TestMapCUAction:
 
     @pytest.fixture(autouse=True)
     def setup(self, mock_async_openai):
-        MockAsyncOpenAI_class, mock_client = (
+        mock_openai_cls, mock_client = (
             mock_async_openai  # unpack here, not used directly in this fixture, but good practice
         )
         self.backend = OpenAICompatBackend(model="gpt-5.4", api_key="test_key")
@@ -633,7 +631,7 @@ class TestPlanObserveLocate:
 
     @pytest.fixture(autouse=True)
     def setup(self, mock_async_openai):
-        MockAsyncOpenAI_class, self.mock_client = mock_async_openai
+        mock_openai_cls, self.mock_client = mock_async_openai
         self.cu_backend = OpenAICompatBackend(model="gpt-5.4", api_key="test_key")
         self.legacy_backend = OpenAICompatBackend(model="gpt-4o", api_key="test_key")
         self.mock_responses_create = AsyncMock()
@@ -813,9 +811,10 @@ class TestPlanObserveLocate:
 
     async def test_plan_legacy(self):
         mock_choice = MagicMock()
-        mock_choice.message.content = """
-{"action": {"action_type": "type", "text": "hello"}, "reasoning": "type text", "done": false, "confidence": 0.8}
-"""
+        mock_choice.message.content = (
+            '{"action": {"action_type": "type", "text": "hello"},'
+            ' "reasoning": "type text", "done": false, "confidence": 0.8}'
+        )
         self.mock_chat_completions_create.return_value = MagicMock(choices=[mock_choice])
 
         result = await self.legacy_backend.plan(self.screenshot_bytes, "task", history=[])
@@ -865,7 +864,7 @@ class TestLegacyChatCompletions:
 
     @pytest.fixture(autouse=True)
     def setup(self, mock_async_openai):
-        MockAsyncOpenAI_class, self.mock_client = mock_async_openai
+        mock_openai_cls, self.mock_client = mock_async_openai
         self.legacy_backend = OpenAICompatBackend(model="gpt-4o", api_key="test_key")
         self.mock_chat_completions_create = AsyncMock()
         self.mock_client.chat.completions.create = self.mock_chat_completions_create

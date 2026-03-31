@@ -356,8 +356,8 @@ class TestAnalyzeStreamMocked:
 
 class TestPubChemEndpoint:
     def test_pubchem_lookup_success(self, client):
-        with patch("device_use.tools.pubchem.PubChemTool") as MockTool:
-            mock_tool = MockTool.return_value
+        with patch("device_use.tools.pubchem.PubChemTool") as mock_tool_cls:
+            mock_tool = mock_tool_cls.return_value
             mock_tool.lookup_by_name.return_value = {
                 "CID": 1234,
                 "IUPACName": "test-name",
@@ -373,8 +373,8 @@ class TestPubChemEndpoint:
     def test_pubchem_lookup_not_found(self, client):
         from device_use.tools.pubchem import PubChemError
 
-        with patch("device_use.tools.pubchem.PubChemTool") as MockTool:
-            mock_tool = MockTool.return_value
+        with patch("device_use.tools.pubchem.PubChemTool") as mock_tool_cls:
+            mock_tool = mock_tool_cls.return_value
             mock_tool.lookup_by_name.side_effect = PubChemError("Not found")
             res = client.get("/api/pubchem/nonexistent_xyz")
         assert res.status_code == 404

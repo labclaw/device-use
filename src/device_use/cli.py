@@ -255,6 +255,8 @@ def _scaffold(device_name: str, output_dir: str):
     class_name = "".join(
         w.capitalize() for w in device_name.replace("-", " ").replace("_", " ").split()
     )
+    # Extract vendor from device name (first part before dash/underscore)
+    vendor = device_name.split("-")[0].split("_")[0].capitalize()
     root = os.path.join(output_dir, pkg_name)
 
     if os.path.exists(root):
@@ -337,7 +339,7 @@ class {class_name}Adapter(BaseInstrument):
     def info(self) -> InstrumentInfo:
         return InstrumentInfo(
             name="{class_name}",
-            vendor="TODO",
+            vendor="{vendor}",
             instrument_type="{slug}",
             supported_modes=[ControlMode.OFFLINE, ControlMode.API, ControlMode.GUI],
             version="0.1.0",

@@ -257,6 +257,27 @@ class TestScaffold:
         out = capsys.readouterr().out
         assert "already exists" in out
 
+    def test_scaffold_vendor_extraction(self, tmp_path):
+        """Vendor should be extracted from device name (first part before dash)."""
+        cli._scaffold("biotek-gen5", str(tmp_path))
+        adapter_file = (
+            tmp_path / "device_use_biotek_gen5" / "src" / "device_use_biotek_gen5" / "adapter.py"
+        )
+        content = adapter_file.read_text()
+        assert 'vendor="Biotek"' in content
+        # Ensure vendor field doesn't have the placeholder
+        assert 'vendor="TODO"' not in content
+
+    def test_scaffold_vendor_single_word(self, tmp_path):
+        """Vendor should be capitalized for single-word device names."""
+        cli._scaffold("mydevice", str(tmp_path))
+        adapter_file = (
+            tmp_path / "device_use_mydevice" / "src" / "device_use_mydevice" / "adapter.py"
+        )
+        content = adapter_file.read_text()
+        assert 'vendor="Mydevice"' in content
+        assert 'vendor="TODO"' not in content
+
 
 # ---------------------------------------------------------------------------
 # _write
