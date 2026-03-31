@@ -527,7 +527,7 @@ class TestFromExamdata:
         expno_dir.mkdir()
         # No fid file
 
-        mock_processor = MagicMock()
+        MagicMock()  # processor not directly needed
         lib = SpectralLibrary(tolerance_ppm=0.05)
         for sample_dir_child in sorted(examdata.iterdir()):
             if not sample_dir_child.is_dir() or sample_dir_child.name.startswith("."):

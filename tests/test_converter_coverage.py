@@ -28,7 +28,7 @@ from device_use.knowledge.converter import (
 
 
 class TestResolveRedirect:
-    def test_url_without_enUS_pattern_returns_none(self, tmp_path):
+    def test_url_without_en_us_pattern_returns_none(self, tmp_path):
         """Line 182: redirect URL that doesn't match the en-US regex."""
         stub = tmp_path / "stub.html"
         stub.write_text('<meta http-equiv="refresh" content="0;url=/some/other/path/page.html">')
@@ -247,7 +247,7 @@ class TestConvertTopspinCommandEdgeCases:
         assert result["summary"] == "This is a detailed description for the command page."
         assert result["commands"] == []
 
-    def test_convert_missing_enUS_dir(self, tmp_path):
+    def test_convert_missing_en_us_dir(self, tmp_path):
         """convert_topspin_command returns None when en-US dir is missing."""
         stub = tmp_path / "missing.html"
         stub.write_text(
@@ -291,7 +291,6 @@ class TestConvertAllCommandsCoverage:
             pass
 
         # More direct approach: patch convert_topspin_command itself
-        original = convert_topspin_command
         with patch(
             "device_use.knowledge.converter.convert_topspin_command",
             side_effect=RuntimeError("boom"),
@@ -589,7 +588,7 @@ class TestExtractCommandsEdgeCases:
 
 
 class TestRedirectParserEdgeCases:
-    def test_uppercase_REFRESH(self):
+    def test_uppercase_refresh(self):
         """http-equiv='REFRESH' (uppercase) is matched case-insensitively."""
         html = (
             '<meta http-equiv="REFRESH"'
@@ -774,7 +773,7 @@ class TestMainCLI:
         ):
             main()
 
-        captured = capsys.readouterr()
+        capsys.readouterr()
         assert custom_index.exists()
 
     def test_main_no_entries_no_index(self, tmp_path, capsys):
