@@ -24,6 +24,7 @@ import io
 import json
 import logging
 import platform
+import threading
 import time
 import traceback
 from typing import Any, Optional
@@ -688,11 +689,74 @@ _CU_RUNNERS: dict[str, Any] = {
 }
 
 
+# --- Session diagnostics ---
+
+
+def _get_session_info() -> dict[str, Any]:
+    """Get Windows session information for debugging Session 0 isolation.
+
+    Returns process session ID, active console session ID, and whether
+    this process can reach the interactive desktop.
+    """
+    info: dict[str, Any] = {
+        "process_session_id": None,
+        "console_session_id": None,
+        "in_interactive_session": False,
+        "platform": platform.system(),
+    }
+
+    if platform.system() != "Windows":
+        info["note"] = "Session isolation is Windows-only"
+        info["in_interactive_session"] = True
+        return info
+
+    try:
+        import ctypes
+        # WTSGetActiveConsoleSessionId — returns the session attached to
+        # the physical console (keyboard/mouse/display)
+        kernel32 = ctypes.windll.kernel32
+        console_session = kernel32.WTSGetActiveConsoleSessionId()
+        info["console_session_id"] = int(console_session)
+
+        # Get our own process session ID
+        import os as _os
+        pid = _os.getpid()
+        process_session = ctypes.c_ulong()
+        kernel32.ProcessIdToSessionId(pid, ctypes.byref(process_session))
+        info["process_session_id"] = int(process_session.value)
+
+        # We are in the interactive session if our session matches console
+        info["in_interactive_session"] = (
+            info["process_session_id"] == info["console_session_id"]
+        )
+
+        if not info["in_interactive_session"]:
+            info["warning"] = (
+                f"Process is in Session {info['process_session_id']} but "
+                f"console is Session {info['console_session_id']}. "
+                "pyautogui clicks will NOT reach the desktop. "
+                "Use fix_session.sh or restart_agent_interactive.ps1 to fix."
+            )
+    except Exception as e:
+        info["error"] = f"Cannot query session info: {e}"
+
+    return info
+
+
+class LaunchRequest(BaseModel):
+    """Launch an application in the agent's session (not via SSH)."""
+    executable: str
+    args: list[str] = []
+    wait: bool = False
+    timeout: int = 10
+
+
 # --- Endpoints ---
 
 
 @app.get("/health")
 def health():
+    session = _get_session_info()
     return {
         "status": "ok",
         "hostname": platform.node(),
@@ -700,7 +764,70 @@ def health():
         "python": platform.python_version(),
         "mss": mss is not None,
         "pyautogui": pyautogui is not None,
+        "session": session,
     }
+
+
+@app.get("/session")
+def session_info(authorization: Optional[str] = Header(None)):
+    """Diagnose Windows session isolation.
+
+    Returns whether this process is in the interactive desktop session.
+    If not, pyautogui/pywinauto actions will not reach the user's desktop.
+
+    Fix: Use fix_session.sh or restart_agent_interactive.ps1 to restart
+    the agent in the correct session via Windows Task Scheduler with /IT.
+    """
+    _check_auth(authorization)
+    return _get_session_info()
+
+
+@app.post("/launch")
+def launch_app(req: LaunchRequest, authorization: Optional[str] = Header(None)):
+    """Launch an application in the agent's session.
+
+    Since the agent runs in the interactive session (after fix_session),
+    subprocess.Popen here inherits that session. This avoids the SSH
+    session isolation problem where apps launched via SSH end up in
+    Session 0 and are invisible on the desktop.
+
+    Use this instead of SSH to launch GUI applications.
+    """
+    _check_auth(authorization)
+
+    import subprocess as sp
+
+    cmd = [req.executable] + req.args
+    logger.info("Launching: %s", cmd)
+
+    try:
+        proc = sp.Popen(
+            cmd,
+            stdout=sp.PIPE if req.wait else sp.DEVNULL,
+            stderr=sp.PIPE if req.wait else sp.DEVNULL,
+            creationflags=0x00000010 if platform.system() == "Windows" else 0,
+            # 0x10 = CREATE_NEW_CONSOLE — gives the app its own console window
+        )
+
+        if req.wait:
+            stdout, stderr = proc.communicate(timeout=req.timeout)
+            return {
+                "ok": True,
+                "pid": proc.pid,
+                "returncode": proc.returncode,
+                "stdout": stdout.decode("utf-8", errors="replace")[:2000],
+                "stderr": stderr.decode("utf-8", errors="replace")[:2000],
+            }
+        else:
+            return {
+                "ok": True,
+                "pid": proc.pid,
+                "note": "Process launched in background (agent's session)",
+            }
+    except FileNotFoundError:
+        raise HTTPException(404, f"Executable not found: {req.executable}")
+    except Exception as e:
+        raise HTTPException(500, f"Launch failed: {e}")
 
 
 def _draw_cursor(img):
@@ -948,6 +1075,115 @@ def info(authorization: Optional[str] = Header(None)):
         "python": platform.python_version(),
         "screen_width": screen_size[0],
         "screen_height": screen_size[1],
+    }
+
+
+# --- Local screen recording (runs in interactive session) ---
+
+_recorder_thread: Optional[threading.Thread] = None
+_recorder_running = False
+_recorder_frame_count = 0
+_recorder_start_time = 0.0
+_recorder_output_dir = ""
+
+
+class RecordRequest(BaseModel):
+    fps: int = 30
+    output_dir: str = "C:\\temp\\oe_recording\\frames"
+    duration: int = 0  # 0 = manual stop
+
+
+def _record_loop(output_dir: str, fps: int, duration: int):
+    global _recorder_running, _recorder_frame_count
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    interval = 1.0 / fps
+    sct = mss.mss()
+    monitor = sct.monitors[1]
+    start = time.time()
+
+    while _recorder_running:
+        if duration > 0 and (time.time() - start) > duration:
+            break
+        t0 = time.time()
+        try:
+            img = sct.grab(monitor)
+            from PIL import Image as PILImage, ImageDraw
+            pil_img = PILImage.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
+            # Draw cursor crosshair at current mouse position
+            if pyautogui:
+                mx, my = pyautogui.position()
+                draw = ImageDraw.Draw(pil_img)
+                r = 15
+                draw.ellipse([mx - r, my - r, mx + r, my + r],
+                             outline=(255, 200, 0), width=3)
+                draw.line([mx - r - 5, my, mx + r + 5, my],
+                          fill=(255, 200, 0), width=2)
+                draw.line([mx, my - r - 5, mx, my + r + 5],
+                          fill=(255, 200, 0), width=2)
+            path = os.path.join(output_dir, f"f_{_recorder_frame_count:06d}.jpg")
+            pil_img.save(path, "JPEG", quality=85)
+            _recorder_frame_count += 1
+        except Exception:
+            pass
+        elapsed = time.time() - t0
+        sl = max(0, interval - elapsed)
+        if sl > 0:
+            time.sleep(sl)
+
+    _recorder_running = False
+
+
+@app.post("/record/start")
+def record_start(req: RecordRequest, authorization: Optional[str] = Header(None)):
+    _check_auth(authorization)
+    global _recorder_thread, _recorder_running, _recorder_frame_count
+    global _recorder_start_time, _recorder_output_dir
+
+    if _recorder_running:
+        return {"ok": False, "error": "already recording"}
+
+    _recorder_running = True
+    _recorder_frame_count = 0
+    _recorder_start_time = time.time()
+    _recorder_output_dir = req.output_dir
+
+    _recorder_thread = threading.Thread(
+        target=_record_loop,
+        args=(req.output_dir, req.fps, req.duration),
+        daemon=True,
+    )
+    _recorder_thread.start()
+    return {"ok": True, "fps": req.fps, "output_dir": req.output_dir}
+
+
+@app.post("/record/stop")
+def record_stop(authorization: Optional[str] = Header(None)):
+    _check_auth(authorization)
+    global _recorder_running
+    _recorder_running = False
+    if _recorder_thread:
+        _recorder_thread.join(timeout=10)
+    elapsed = time.time() - _recorder_start_time
+    actual_fps = _recorder_frame_count / elapsed if elapsed > 0 else 0
+    return {
+        "ok": True,
+        "frames": _recorder_frame_count,
+        "duration_s": round(elapsed, 1),
+        "actual_fps": round(actual_fps, 1),
+        "output_dir": _recorder_output_dir,
+    }
+
+
+@app.get("/record/status")
+def record_status(authorization: Optional[str] = Header(None)):
+    _check_auth(authorization)
+    elapsed = time.time() - _recorder_start_time if _recorder_running else 0
+    return {
+        "recording": _recorder_running,
+        "frames": _recorder_frame_count,
+        "elapsed_s": round(elapsed, 1),
+        "output_dir": _recorder_output_dir,
     }
 
 
