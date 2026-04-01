@@ -69,11 +69,13 @@ class PromptBuilder:
             f"Task: {task}\n"
             f"Step: {step}\n"
             f"Current observation: {observation}\n\n"
-            "Plan the next action. Respond with a JSON object:\n"
+            "Choose the NEXT concrete action. You MUST select click, type, hotkey, scroll, or drag.\n"
+            "Do NOT choose 'wait'. Act on the current screen NOW.\n"
+            "Respond with a JSON object:\n"
             "{\n"
             '  "reasoning": "why this action is needed",\n'
             '  "action": {\n'
-            '    "action_type": "click|type|hotkey|scroll|drag|wait",\n'
+            '    "action_type": "click|type|hotkey|scroll|drag",\n'
             '    "coordinates": [x, y],  // for click/scroll actions\n'
             '    "text": "...",           // for type action\n'
             '    "keys": ["ctrl", "s"],   // for hotkey action\n'

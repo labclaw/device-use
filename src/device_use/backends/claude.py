@@ -121,12 +121,15 @@ class ClaudeBackend:
         prompt = (
             f"Task: {task}\n\n"
             f"{history_text}"
-            "Look at the current screen and plan the next action.\n"
+            "Look at the current screen and choose the NEXT concrete action.\n"
+            "You MUST select a real action: click, type, hotkey, scroll, or drag.\n"
+            "Do NOT choose 'wait'. Do NOT say you need more information.\n"
+            "The screenshot is the current live state — act on it NOW.\n"
             "Respond with JSON:\n"
             "{\n"
             '  "reasoning": "why this action",\n'
             '  "action": {\n'
-            '    "action_type": "click|type|hotkey|scroll|drag|wait",\n'
+            '    "action_type": "click|type|hotkey|scroll|drag",\n'
             '    "coordinates": [x, y],\n'
             '    "text": "...",\n'
             '    "keys": ["ctrl", "s"],\n'
@@ -151,12 +154,13 @@ class ClaudeBackend:
         try:
             return json.loads(_strip_markdown_fences(response))
         except json.JSONDecodeError:
-            logger.warning("Failed to parse plan response as JSON: %s", response[:200])
+            logger.error("Failed to parse plan response as JSON: %s", response[:500])
             return {
-                "reasoning": response,
-                "action": {"action_type": "wait", "seconds": 1},
+                "reasoning": f"JSON parse error — raw: {response[:200]}",
+                "action": {"action_type": "screenshot", "description": "re-observe after parse failure"},
                 "done": False,
                 "confidence": 0.0,
+                "error": "json_parse_failure",
             }
 
     async def locate(self, screenshot: bytes, element_description: str) -> tuple[int, int] | None:
