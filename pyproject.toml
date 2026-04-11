@@ -23,7 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 nmr = [
-    "nmrglue>=0.9",
+    "nmrglue>=0.11",
     "numpy>=1.24",
     "scipy>=1.10",
     "matplotlib>=3.7",
