@@ -16,7 +16,7 @@ dependencies = [
     "pyautogui>=0.9",
     "pyperclip>=1.8",
     "mss>=9.0",
-    "anthropic>=0.40",
+    "anthropic>=0.94.0",
     "openai>=1.0",
     "backoff>=2.0",
 ]
