@@ -26,7 +26,7 @@ nmr = [
     "nmrglue>=0.9",
     "numpy>=1.24",
     "scipy>=1.10",
-    "matplotlib>=3.7",
+    "matplotlib>=3.10.8",
 ]
 web = [
     "fastapi>=0.100",
